@@ -50,6 +50,16 @@ loadDriversList().then(() => {
 const replayMap = L.map('replayMap').setView([24.7136, 46.6753], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(replayMap);
 
+(async function centerReplayMapOnWorkZone() {
+  try {
+    const res = await fetch(`${API_URL}/settings/workzone`, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    if (data.success && data.lat && data.lng) {
+      replayMap.setView([data.lat, data.lng], 12);
+    }
+  } catch (_) {}
+})();
+
 let routePoints = [];
 let routeLine = null;
 let routeMarker = null;
