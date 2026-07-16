@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../services/location_service.dart';
 import '../services/app_strings.dart';
@@ -26,6 +27,9 @@ class _HomeScreenState extends State<HomeScreen> {
   String _driverName = '';
   int _unreadMessages = 0;
   Timer? _unreadTimer;
+  int _consecutiveDays = 0;
+  String? _whatsappNumber;
+  String? _phoneNumber;
 
   @override
   void initState() {
@@ -35,7 +39,40 @@ class _HomeScreenState extends State<HomeScreen> {
     _refreshUnread();
     _checkLastCrash();
     _setupPushNotifications();
+    _loadAchievements();
+    _loadContactInfo();
     _unreadTimer = Timer.periodic(const Duration(seconds: 15), (_) => _refreshUnread());
+  }
+
+  Future<void> _loadAchievements() async {
+    try {
+      final result = await ApiService.getMyReport();
+      if (mounted) setState(() => _consecutiveDays = result['consecutiveDays'] ?? 0);
+    } catch (_) {}
+  }
+
+  Future<void> _loadContactInfo() async {
+    try {
+      final result = await ApiService.getContactInfo();
+      if (mounted) {
+        setState(() {
+          _whatsappNumber = result['whatsappNumber'];
+          _phoneNumber = result['phoneNumber'];
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _openWhatsapp() async {
+    if (_whatsappNumber == null || _whatsappNumber!.isEmpty) return;
+    final uri = Uri.parse('https://wa.me/$_whatsappNumber');
+    if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _callAdmin() async {
+    if (_phoneNumber == null || _phoneNumber!.isEmpty) return;
+    final uri = Uri.parse('tel:$_phoneNumber');
+    if (await canLaunchUrl(uri)) await launchUrl(uri);
   }
 
   Future<void> _syncShiftStatus() async {
@@ -281,6 +318,27 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            if (_consecutiveDays > 0)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: Colors.amber),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('🔥', style: TextStyle(fontSize: 20)),
+                    const SizedBox(width: 8),
+                    Text(
+                      '$_consecutiveDays يوم عمل متتالي',
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+                    ),
+                  ],
+                ),
+              ),
             Icon(
               _onShift ? Icons.location_on : Icons.location_off,
               size: 100,
@@ -338,6 +396,34 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.calendar_month),
               label: Text(AppStrings.get('requestLeave')),
             ),
+            if ((_whatsappNumber?.isNotEmpty ?? false) || (_phoneNumber?.isNotEmpty ?? false)) ...[
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 8),
+              const Text('تواصل مباشر مع الإدارة', style: TextStyle(color: Colors.grey, fontSize: 13)),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (_whatsappNumber?.isNotEmpty ?? false)
+                    ElevatedButton.icon(
+                      onPressed: _openWhatsapp,
+                      icon: const Icon(Icons.chat, size: 20),
+                      label: const Text('واتساب'),
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
+                    ),
+                  if ((_whatsappNumber?.isNotEmpty ?? false) && (_phoneNumber?.isNotEmpty ?? false))
+                    const SizedBox(width: 12),
+                  if (_phoneNumber?.isNotEmpty ?? false)
+                    ElevatedButton.icon(
+                      onPressed: _callAdmin,
+                      icon: const Icon(Icons.call, size: 20),
+                      label: const Text('اتصال'),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+                    ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
