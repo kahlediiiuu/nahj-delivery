@@ -7,7 +7,6 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
   window.location.href = 'login.html';
 });
 
-// ------- التبويبات -------
 document.querySelectorAll('.tab-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
@@ -17,7 +16,6 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
   });
 });
 
-// ------- تحميل قائمة المناديب -------
 let driversList = [];
 async function loadDriversList() {
   const res = await fetch(`${API_URL}/drivers`, { headers: { Authorization: `Bearer ${token}` } });
@@ -28,9 +26,27 @@ async function loadDriversList() {
     select.innerHTML = driversList.map((d) => `<option value="${d.id}">${d.name} (#${d.driverCode})</option>`).join('');
   }
 }
-loadDriversList();
+loadDriversList().then(() => {
+  const params = new URLSearchParams(window.location.search);
+  const requestedDriverId = params.get('driverId');
+  const requestedTab = params.get('tab');
 
-// ================= إعادة تشغيل المسار (Replay) =================
+  if (requestedTab === 'replay') {
+    document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
+    const routeTabBtn = document.querySelector('.tab-btn[data-tab="replay"]');
+    if (routeTabBtn) routeTabBtn.classList.add('active');
+    const routeTabPanel = document.getElementById('tab-replay');
+    if (routeTabPanel) routeTabPanel.classList.add('active');
+  }
+
+  if (requestedDriverId) {
+    const select = document.getElementById('replayDriverSelect');
+    select.value = requestedDriverId;
+    document.getElementById('loadRouteBtn')?.click();
+  }
+});
+
 const replayMap = L.map('replayMap').setView([24.7136, 46.6753], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(replayMap);
 
@@ -102,7 +118,6 @@ document.getElementById('playBtn').addEventListener('click', () => {
 
 document.getElementById('pauseBtn').addEventListener('click', () => clearInterval(playInterval));
 
-// ================= لوحة الأداء والمقارنة =================
 const today = new Date().toISOString().slice(0, 10);
 const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
 document.getElementById('fromDate').value = weekAgo;
@@ -138,7 +153,6 @@ async function loadLeaderboard() {
 document.getElementById('loadLeaderboardBtn').addEventListener('click', loadLeaderboard);
 loadLeaderboard();
 
-// ------- التصدير -------
 document.getElementById('exportExcelBtn').addEventListener('click', () => {
   const rows = currentLeaderboard.map((d, i) => ({
     'الترتيب': i + 1,
@@ -155,7 +169,6 @@ document.getElementById('exportExcelBtn').addEventListener('click', () => {
   XLSX.writeFile(wb, `تقرير_الأداء_${document.getElementById('fromDate').value}_${document.getElementById('toDate').value}.xlsx`);
 });
 
-// تصدير PDF: نستخدم نافذة طباعة المتصفح (Ctrl+P → حفظ كـ PDF) - أبسط وأكثر موثوقية من مكتبات PDF الخارجية
 document.getElementById('exportPdfBtn').addEventListener('click', () => {
   window.print();
 });
