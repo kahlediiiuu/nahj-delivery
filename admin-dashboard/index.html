@@ -57,6 +57,11 @@
       <label style="display:block;">اختر سبب التنبيه أو اكتب رسالة مخصصة</label>
       <select id="globalAlertReasonSelect" style="width:100%;padding:8px;margin:6px 0;border-radius:6px;border:1px solid #cbd5e1;"></select>
 
+      <label style="display:flex;align-items:center;gap:8px;margin:10px 0;">
+        <input type="checkbox" id="globalAlertSilentCheckbox">
+        <span>🔕 بدون صوت (إشعار نصي هادئ فقط)</span>
+      </label>
+
       <div id="globalAlertCustomTextWrap" style="display:none;">
         <textarea id="globalAlertCustomText" rows="3" placeholder="اكتب نص الرسالة هنا..." style="width:100%;padding:8px;border-radius:6px;border:1px solid #cbd5e1;"></textarea>
       </div>
