@@ -65,14 +65,14 @@ const alertReasons = [
   { label: '✍️ رسالة أخرى مخصصة', text: '' },
 ];
 
-async function sendAlertMessage(driverId, text) {
+async function sendAlertMessage(driverId, text, silent = false) {
   try {
     await fetch(`${API_URL}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ driverId, text: `⚠️ ${text}` }),
+      body: JSON.stringify({ driverId, text: `⚠️ ${text}`, silent }),
     });
-    alert('تم إرسال التنبيه بنجاح، وسيصل للمندوب كإشعار فوري بصوت (بمجرد فتحه للتطبيق أو أثناء الدوام)');
+    alert('تم إرسال التنبيه بنجاح، وسيصل للمندوب كإشعار فوري (بمجرد فتحه للتطبيق أو أثناء الدوام)');
   } catch (_) {
     alert('تعذّر إرسال التنبيه، تحقق من الاتصال');
   }
@@ -145,7 +145,8 @@ document.getElementById('globalAlertSendBtn').addEventListener('click', async ()
     if (!text) return alert('اكتب نص الرسالة المخصصة أولًا');
   }
 
-  await sendAlertMessage(driverId, text);
+  const silent = document.getElementById('globalAlertSilentCheckbox').checked;
+  await sendAlertMessage(driverId, text, silent);
   document.getElementById('globalAlertModal').classList.add('hidden');
 });
 
