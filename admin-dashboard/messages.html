@@ -7,7 +7,8 @@
 <link rel="stylesheet" href="css/style.css">
 <style>
   .chat-layout { display:flex; height:calc(100vh - 60px); }
-  .conv-list { width:300px; background:#fff; border-left:1px solid #e2e8f0; overflow-y:auto; }
+  .conv-list { width:300px; background:#fff; border-left:1px solid #e2e8f0; display:flex; flex-direction:column; }
+  #convList { overflow-y:auto; flex:1; }
   .conv-item { padding:14px; border-bottom:1px solid #f1f5f9; cursor:pointer; }
   .conv-item:hover { background:#f8fafc; }
   .conv-item.active { background:#eef2ff; }
@@ -36,17 +37,42 @@
   </div>
 
   <div class="chat-layout">
-    <div class="conv-list" id="convList"></div>
+    <div class="conv-list" id="convList-wrap">
+      <div style="padding:10px;background:#fff;border-bottom:1px solid #e2e8f0;">
+        <input type="text" id="convSearch" placeholder="بحث عن مندوب..." style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;">
+      </div>
+      <div id="convList"></div>
+    </div>
     <div class="chat-area">
       <div class="chat-messages" id="chatMessages">
         <div class="empty-state">اختر مندوباً من القائمة لبدء المحادثة</div>
       </div>
-      <div class="chat-input-row" id="chatInputRow" style="display:none;">
-        <input type="text" id="messageInput" placeholder="اكتب رسالة...">
-        <button id="sendBtn">إرسال</button>
+      <div class="chat-input-row" id="chatInputRow" style="display:none;flex-direction:column;gap:8px;">
+        <select id="motivationalSelect" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;">
+          <option value="">— اختر رسالة تحفيزية جاهزة (اختياري) —</option>
+        </select>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="messageInput" placeholder="اكتب رسالة...">
+          <button id="sendBtn">إرسال</button>
+        </div>
       </div>
     </div>
   </div>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      const presets = [
+        '🙏 رسالة شكر', '🎉 تهنئة', '💪 تحفيز', '🎁 عرض/مكافأة', '📢 إعلان عام',
+      ];
+      const select = document.getElementById('motivationalSelect');
+      presets.forEach((label, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = label;
+        select.appendChild(opt);
+      });
+    });
+  </script>
 
   <script src="js/config.js"></script>
   <script src="js/messages.js"></script>
