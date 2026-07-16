@@ -151,6 +151,15 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  static Future<Map<String, dynamic>> getContactInfo() async {
+    final token = await getToken();
+    final res = await http.get(
+      Uri.parse('$baseUrl/settings/contact'),
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 15));
+    return jsonDecode(res.body);
+  }
+
   static Future<Map<String, dynamic>> getMyReport({String? date}) async {
     final token = await getToken();
     final uri = date != null
