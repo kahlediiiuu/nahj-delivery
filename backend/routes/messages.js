@@ -2,13 +2,13 @@ const express = require('express');
 const router = express.Router();
 const { db } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
+const { sendPushToDriver } = require('../utils/push');
 
 router.use(verifyToken);
 
-// إرسال رسالة (يستخدمه المشرف بتحديد driverId، أو المندوب لنفسه تلقائياً)
 router.post('/', async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, requiresResponse } = req.body;
     if (!text || !text.trim()) {
       return res.status(400).json({ success: false, message: 'الرسالة فارغة' });
     }
@@ -33,7 +33,18 @@ router.post('/', async (req, res) => {
       createdAt: now,
       readByAdmin: sender === 'admin',
       readByDriver: sender === 'driver',
+      requiresResponse: sender === 'admin' ? !!requiresResponse : false,
+      response: null,
     });
+
+    if (sender === 'admin') {
+      await sendPushToDriver(
+        driverId,
+        requiresResponse ? '⚠️ تنبيه يتطلب ردك الفوري' : '📩 رسالة جديدة من الإدارة',
+        text.trim(),
+        { messageId: docRef.id, requiresResponse: !!requiresResponse }
+      );
+    }
 
     res.json({ success: true, id: docRef.id, createdAt: now });
   } catch (err) {
@@ -42,7 +53,26 @@ router.post('/', async (req, res) => {
   }
 });
 
-// المشرف: جلب محادثة كاملة مع مندوب محدد
+router.post('/:id/respond', async (req, res) => {
+  try {
+    if (req.user.role !== 'driver') {
+      return res.status(403).json({ success: false, message: 'مسموح للمناديب فقط' });
+    }
+    const { response } = req.body;
+    if (!response || !response.trim()) {
+      return res.status(400).json({ success: false, message: 'الرد فارغ' });
+    }
+    await db.collection('messages').doc(req.params.id).update({
+      response: response.trim(),
+      respondedAt: Date.now(),
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
 router.get('/driver/:driverId', requireAdmin, async (req, res) => {
   try {
     const snap = await db
@@ -54,7 +84,6 @@ router.get('/driver/:driverId', requireAdmin, async (req, res) => {
       .map((d) => ({ id: d.id, ...d.data() }))
       .sort((a, b) => a.createdAt - b.createdAt);
 
-    // تعليم رسائل المندوب كمقروءة من المشرف
     const unread = snap.docs.filter((d) => d.data().sender === 'driver' && !d.data().readByAdmin);
     await Promise.all(unread.map((d) => d.ref.update({ readByAdmin: true })));
 
@@ -65,7 +94,6 @@ router.get('/driver/:driverId', requireAdmin, async (req, res) => {
   }
 });
 
-// المشرف: قائمة كل المحادثات مع عدد الرسائل غير المقروءة لكل مندوب
 router.get('/conversations', requireAdmin, async (req, res) => {
   try {
     const driversSnap = await db.collection('drivers').get();
@@ -94,7 +122,6 @@ router.get('/conversations', requireAdmin, async (req, res) => {
   }
 });
 
-// المندوب: جلب محادثته الخاصة مع المشرف
 router.get('/my', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -119,7 +146,6 @@ router.get('/my', async (req, res) => {
   }
 });
 
-// المندوب: هل توجد رسائل جديدة؟ (فحص سريع وخفيف للاستطلاع الدوري)
 router.get('/my/unread-count', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
