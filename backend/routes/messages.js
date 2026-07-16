@@ -37,7 +37,7 @@ router.post('/', async (req, res) => {
       response: null,
     });
 
-   if (sender === 'admin') {
+    if (sender === 'admin') {
       await sendPushToDriver(
         driverId,
         requiresResponse ? '⚠️ تنبيه يتطلب ردك الفوري' : '📩 رسالة جديدة من الإدارة',
@@ -128,6 +128,7 @@ router.get('/my', async (req, res) => {
     if (req.user.role !== 'driver') {
       return res.status(403).json({ success: false, message: 'مسموح للمناديب فقط' });
     }
+    const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
     const snap = await db
       .collection('messages')
       .where('driverId', '==', req.user.driverId)
@@ -135,12 +136,13 @@ router.get('/my', async (req, res) => {
 
     const messages = snap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((m) => m.createdAt >= dayAgo)
       .sort((a, b) => a.createdAt - b.createdAt);
 
     const unread = snap.docs.filter((d) => d.data().sender === 'admin' && !d.data().readByDriver);
     await Promise.all(unread.map((d) => d.ref.update({ readByDriver: true })));
 
-    res.json({ success: true, messages });
+    res.json({ success: true, messages, expiryNote: 'تُحذف الرسائل تلقائياً من هنا بعد مرور 24 ساعة' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
@@ -159,6 +161,29 @@ router.get('/my/unread-count', async (req, res) => {
       .where('readByDriver', '==', false)
       .get();
     res.json({ success: true, unreadCount: snap.size });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+router.delete('/:id', requireAdmin, async (req, res) => {
+  try {
+    await db.collection('messages').doc(req.params.id).delete();
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+router.post('/:id/resend', requireAdmin, async (req, res) => {
+  try {
+    const doc = await db.collection('messages').doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).json({ success: false, message: 'الرسالة غير موجودة' });
+    const m = doc.data();
+    await sendPushToDriver(m.driverId, '📩 رسالة (إعادة إرسال)', m.text, { messageId: doc.id });
+    res.json({ success: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
