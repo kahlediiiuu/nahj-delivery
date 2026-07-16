@@ -7,6 +7,18 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 
+const List<String> _motivationalMessages = [
+  '☀️ صباح الخير يا بطل',
+  '🚗 نتمنى لك يوماً موفقاً',
+  '🙏 شكراً لالتزامك',
+  '⭐ جهودك محل تقدير',
+  '🏆 حافظ على تقييمك المرتفع',
+  '🎁 كل طلب تنجزه يقربك من مكافآتك',
+  '📈 استمرارك في الالتزام يزيد فرص حصولك على المكافآت',
+  '🛣️ نتمنى لك قيادة آمنة',
+  '💙 أنت جزء مهم من فريق نهج للتوصيل',
+];
+
 class LocationService {
   static Future<void> initialize() async {
     final service = FlutterBackgroundService();
@@ -118,7 +130,8 @@ Future<void> _runServiceLoop(ServiceInstance service) async {
         } else if (pendingCount > 0) {
           content = 'جاري مزامنة سجل حضورك...';
         } else {
-          content = 'حضورك مسجَّل الآن';
+          content = _motivationalMessages[
+              (DateTime.now().minute ~/ 5) % _motivationalMessages.length];
         }
         service.setForegroundNotificationInfo(
           title: 'نهج للتوصيل - في العمل',
