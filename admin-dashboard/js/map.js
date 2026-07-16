@@ -1,7 +1,6 @@
 // إدارة خريطة OpenStreetMap عبر Leaflet وعلامات المناديب
-const map = L.map('map').setView([24.7136, 46.6753], 11); // قيمة مبدئية مؤقتة، سيتم تحديثها فورًا من نطاق العمل الفعلي أدناه
+const map = L.map('map').setView([24.7136, 46.6753], 11);
 
-// عند تحميل الصفحة، اجلب نطاق العمل الحقيقي المحفوظ ووسّط الخريطة عليه تلقائيًا
 (async function centerOnRealWorkZone() {
   try {
     const token = sessionStorage.getItem('nahj_admin_token');
@@ -15,12 +14,19 @@ const map = L.map('map').setView([24.7136, 46.6753], 11); // قيمة مبدئي
   } catch (_) {}
 })();
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
   maxZoom: 19,
-}).addTo(map);
+});
+const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: '&copy; Esri',
+  maxZoom: 19,
+});
+streetLayer.addTo(map);
+let isSatellite = false;
 
-const markers = {}; // driverId -> L.marker
+const markers = {};
+window.followedDriverId = null;
 
 function statusColor(loc) {
   const now = Date.now();
@@ -41,13 +47,38 @@ function formatDuration(ms) {
   return `منذ ${hours} ساعة${remMinutes > 0 ? ` و${remMinutes} دقيقة` : ''}`;
 }
 
-function makeIcon(color) {
+function makeIcon(color, isFollowed) {
+  const ring = isFollowed ? 'box-shadow:0 0 0 5px rgba(37,99,235,.4);' : 'box-shadow:0 0 4px rgba(0,0,0,.4);';
   return L.divIcon({
     className: '',
-    html: `<div style="background:${color};width:18px;height:18px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 4px rgba(0,0,0,.4)"></div>`,
+    html: `<div style="background:${color};width:18px;height:18px;border-radius:50%;border:3px solid #fff;${ring}"></div>`,
     iconSize: [18, 18],
   });
 }
+
+async function sendReminderTo(driverId) {
+  try {
+    const token = sessionStorage.getItem('nahj_admin_token');
+    await fetch(`${window.NAHJ_API_URL}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ driverId, text: '⚠️ تنبيه من الإدارة: الرجاء التأكد من فتح التطبيق وبدء الدوام وتفعيل الموقع.' }),
+    });
+    alert('تم إرسال التذكير بنجاح، سيصل للمندوب فور فتحه للتطبيق');
+  } catch (_) {
+    alert('تعذّر إرسال التذكير، تحقق من الاتصال');
+  }
+}
+
+function toggleFollow(driverId) {
+  window.followedDriverId = window.followedDriverId === driverId ? null : driverId;
+  if (window.followedDriverId && markers[driverId]) {
+    map.setView(markers[driverId].getLatLng(), 16);
+  }
+  if (window.lastLocationsData) updateMarkers(window.lastLocationsData, window.lastDriversInfo || {});
+}
+window.sendReminderTo = sendReminderTo;
+window.toggleFollow = toggleFollow;
 
 function updateMarkers(locations, driversInfo) {
   const now = Date.now();
@@ -59,6 +90,7 @@ function updateMarkers(locations, driversInfo) {
     const info = driversInfo[driverId] || {};
     const sinceUpdate = now - (loc.timestamp || now);
     const isOffline = sinceUpdate > 60000;
+    const isFollowed = window.followedDriverId === driverId;
 
     const popupText = `
       <b>${info.name || driverId}</b><br>
@@ -66,19 +98,25 @@ function updateMarkers(locations, driversInfo) {
       السرعة: ${(loc.speed || 0).toFixed(1)} كم/س<br>
       البطارية: ${loc.battery ?? '--'}%<br>
       ${isOffline ? `<span style="color:#dc2626">آخر تحديث: ${formatDuration(sinceUpdate)}</span>` : 'آخر تحديث: الآن'}<br>
-      <a href="#" onclick="window.openDriverDetails && window.openDriverDetails('${driverId}'); return false;" style="color:#2563eb;">عرض التفاصيل الكاملة</a> |
-      <a href="reports.html?driverId=${driverId}&tab=replay" style="color:#16a34a;">متابعة مسار الحركة</a>
+      <button onclick="window.toggleFollow('${driverId}')" style="margin-top:6px;padding:4px 8px;border-radius:6px;border:1px solid #2563eb;background:${isFollowed ? '#2563eb' : '#fff'};color:${isFollowed ? '#fff' : '#2563eb'};cursor:pointer;">
+        ${isFollowed ? '⏹ إيقاف المتابعة المباشرة' : '▶ متابعة مباشرة'}
+      </button>
+      ${isOffline ? `<button onclick="window.sendReminderTo('${driverId}')" style="margin-top:6px;margin-right:4px;padding:4px 8px;border-radius:6px;border:1px solid #dc2626;background:#fff;color:#dc2626;cursor:pointer;">📩 إرسال تذكير</button>` : ''}
+      <br><a href="reports.html?driverId=${driverId}&tab=replay" style="color:#16a34a;">متابعة مسار الحركة (سجل سابق)</a>
     `;
 
     if (markers[driverId]) {
       markers[driverId].setLatLng([loc.lat, loc.lng]);
-      markers[driverId].setIcon(makeIcon(color));
+      markers[driverId].setIcon(makeIcon(color, isFollowed));
       markers[driverId].setPopupContent(popupText);
     } else {
-      markers[driverId] = L.marker([loc.lat, loc.lng], { icon: makeIcon(color) })
+      markers[driverId] = L.marker([loc.lat, loc.lng], { icon: makeIcon(color, isFollowed) })
         .addTo(map)
-        .bindPopup(popupText)
-        .on('click', () => window.openDriverDetails && window.openDriverDetails(driverId));
+        .bindPopup(popupText);
+    }
+
+    if (isFollowed) {
+      map.panTo([loc.lat, loc.lng]);
     }
   }
 
@@ -96,6 +134,29 @@ setInterval(() => {
   }
 }, 15000);
 
+const layerControl = L.control({ position: 'topleft' });
+layerControl.onAdd = function () {
+  const btn = L.DomUtil.create('button', 'layer-toggle-btn');
+  btn.innerHTML = '🛰️';
+  btn.title = 'تبديل نوع الخريطة (عادية / قمر صناعي)';
+  btn.style.cssText = 'width:40px;height:40px;background:#fff;border:2px solid rgba(0,0,0,.2);border-radius:6px;font-size:20px;cursor:pointer;margin-bottom:6px;';
+  L.DomEvent.disableClickPropagation(btn);
+  btn.onclick = () => {
+    isSatellite = !isSatellite;
+    if (isSatellite) {
+      map.removeLayer(streetLayer);
+      satelliteLayer.addTo(map);
+      btn.innerHTML = '🗺️';
+    } else {
+      map.removeLayer(satelliteLayer);
+      streetLayer.addTo(map);
+      btn.innerHTML = '🛰️';
+    }
+  };
+  return btn;
+};
+layerControl.addTo(map);
+
 const locateControl = L.control({ position: 'topleft' });
 locateControl.onAdd = function () {
   const btn = L.DomUtil.create('button', 'locate-me-btn');
@@ -104,10 +165,7 @@ locateControl.onAdd = function () {
   btn.style.cssText = 'width:40px;height:40px;background:#fff;border:2px solid rgba(0,0,0,.2);border-radius:6px;font-size:20px;cursor:pointer;margin-bottom:6px;';
   L.DomEvent.disableClickPropagation(btn);
   btn.onclick = () => {
-    if (!navigator.geolocation) {
-      alert('المتصفح لا يدعم تحديد الموقع');
-      return;
-    }
+    if (!navigator.geolocation) return alert('المتصفح لا يدعم تحديد الموقع');
     navigator.geolocation.getCurrentPosition(
       (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], 15),
       () => alert('تعذّر تحديد موقعك، تأكد من السماح بالوصول للموقع في المتصفح')
@@ -125,9 +183,7 @@ refreshControl.onAdd = function () {
   btn.style.cssText = 'width:40px;height:40px;background:#fff;border:2px solid rgba(0,0,0,.2);border-radius:6px;font-size:20px;cursor:pointer;';
   L.DomEvent.disableClickPropagation(btn);
   btn.onclick = () => {
-    if (window.nahjSocket) {
-      window.nahjSocket.emit('request:locations');
-    }
+    if (window.nahjSocket) window.nahjSocket.emit('request:locations');
     btn.style.transform = 'rotate(360deg)';
     btn.style.transition = 'transform .5s';
     setTimeout(() => { btn.style.transform = ''; btn.style.transition = ''; }, 500);
