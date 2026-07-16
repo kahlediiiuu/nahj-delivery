@@ -28,6 +28,7 @@
     <div class="stat-box"><span class="stat-num" id="statOutside">0</span><span>⚠️ خارج النطاق</span></div>
     <div class="stat-box"><span class="stat-num" id="statMoving">0</span><span>متحرك</span></div>
     <div class="stat-box"><span class="stat-num" id="statStopped">0</span><span>🟡 متوقف</span></div>
+    <button id="openGlobalAlertBtn" style="margin-right:auto;padding:10px 18px;background:#0f172a;color:#fff;border:none;border-radius:8px;cursor:pointer;">📢 إرسال إشعار</button>
   </div>
 
   <div class="main-layout">
@@ -42,6 +43,27 @@
     <div class="modal-content">
       <span class="close-btn" id="closeModal">&times;</span>
       <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <div id="globalAlertModal" class="modal hidden">
+    <div class="modal-content">
+      <span class="close-btn" id="closeGlobalAlertModal">&times;</span>
+      <h3>📢 إرسال إشعار لأي مندوب</h3>
+      <label style="display:block;margin-top:12px;">ابحث عن المندوب (بالاسم، الرقم، أو الجوال)</label>
+      <input type="text" id="globalAlertSearch" placeholder="اكتب للبحث..." style="width:100%;padding:8px;margin:6px 0;border-radius:6px;border:1px solid #cbd5e1;">
+      <select id="globalAlertDriverSelect" size="6" style="width:100%;padding:8px;margin-bottom:12px;border-radius:6px;border:1px solid #cbd5e1;"></select>
+
+      <label style="display:block;">اختر سبب التنبيه أو اكتب رسالة مخصصة</label>
+      <select id="globalAlertReasonSelect" style="width:100%;padding:8px;margin:6px 0;border-radius:6px;border:1px solid #cbd5e1;"></select>
+
+      <div id="globalAlertCustomTextWrap" style="display:none;">
+        <textarea id="globalAlertCustomText" rows="3" placeholder="اكتب نص الرسالة هنا..." style="width:100%;padding:8px;border-radius:6px;border:1px solid #cbd5e1;"></textarea>
+      </div>
+
+      <button id="globalAlertSendBtn" style="width:100%;margin-top:12px;padding:10px;background:#0f172a;color:#fff;border:none;border-radius:6px;cursor:pointer;">
+        إرسال التنبيه الآن
+      </button>
     </div>
   </div>
 
