@@ -78,12 +78,32 @@ router.put('/:id', async (req, res) => {
 });
 
 router.patch('/:id/suspend', async (req, res) => {
-  await db.collection('drivers').doc(req.params.id).update({ status: 'suspended' });
+  const { reason } = req.body;
+  await db.collection('drivers').doc(req.params.id).update({
+    status: 'suspended',
+    suspendReason: reason || '',
+    suspendedAt: Date.now(),
+  });
   res.json({ success: true });
 });
 
 router.patch('/:id/activate', async (req, res) => {
-  await db.collection('drivers').doc(req.params.id).update({ status: 'active' });
+  await db.collection('drivers').doc(req.params.id).update({
+    status: 'active',
+    suspendReason: '',
+  });
+  res.json({ success: true });
+});
+
+router.patch('/:id/toggle-login', async (req, res) => {
+  const { disableLogin } = req.body;
+  await db.collection('drivers').doc(req.params.id).update({ disableLogin: !!disableLogin });
+  res.json({ success: true });
+});
+
+router.patch('/:id/toggle-reports', async (req, res) => {
+  const { hideReports } = req.body;
+  await db.collection('drivers').doc(req.params.id).update({ hideReports: !!hideReports });
   res.json({ success: true });
 });
 
