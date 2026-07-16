@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../services/api_service.dart';
 import '../services/location_service.dart';
 import '../services/app_strings.dart';
@@ -10,6 +11,7 @@ import 'my_report_screen.dart';
 import 'daily_log_screen.dart';
 import 'performance_report_screen.dart';
 import 'messages_screen.dart';
+import 'leave_request_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -31,7 +33,71 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadName();
     _refreshUnread();
     _checkLastCrash();
+    _setupPushNotifications();
     _unreadTimer = Timer.periodic(const Duration(seconds: 15), (_) => _refreshUnread());
+  }
+
+  Future<void> _setupPushNotifications() async {
+    try {
+      await FirebaseMessaging.instance.requestPermission();
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null) {
+        await ApiService.registerFcmToken(fcmToken);
+      }
+      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+        ApiService.registerFcmToken(newToken);
+      });
+
+      FirebaseMessaging.onMessage.listen((message) {
+        _refreshUnread();
+        if (message.data['requiresResponse'] == 'true' && message.data['messageId'] != null) {
+          _showMandatoryResponseDialog(
+            message.data['messageId']!,
+            message.notification?.body ?? '',
+          );
+        }
+      });
+    } catch (_) {}
+  }
+
+  void _showMandatoryResponseDialog(String messageId, String alertText) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: const Text('⚠️ تنبيه يتطلب ردك الفوري'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(alertText),
+              const SizedBox(height: 16),
+              const Text('اكتب سبب ذلك للرد على الإدارة:'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: controller,
+                maxLines: 3,
+                decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'اكتب ردك هنا...'),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () async {
+                final text = controller.text.trim();
+                if (text.isEmpty) return;
+                await ApiService.respondToMessage(messageId, text);
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+              child: const Text('إرسال الرد'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _checkLastCrash() async {
@@ -239,6 +305,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               icon: const Icon(Icons.checklist),
               label: Text(AppStrings.get('dailyLog')),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LeaveRequestScreen()),
+              ),
+              icon: const Icon(Icons.calendar_month),
+              label: Text(AppStrings.get('requestLeave')),
             ),
           ],
         ),
