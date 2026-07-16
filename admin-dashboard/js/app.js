@@ -65,26 +65,89 @@ const alertReasons = [
   { label: '✍️ رسالة أخرى مخصصة', text: '' },
 ];
 
-async function sendCustomAlert(driverId) {
-  const select = document.getElementById('alertReasonSelect');
-  const reason = alertReasons[select.value];
-  let text = reason.text;
-  if (!text) {
-    text = prompt('اكتب نص التنبيه المخصص:');
-    if (!text) return;
-  }
+async function sendAlertMessage(driverId, text) {
   try {
     await fetch(`${API_URL}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ driverId, text: `⚠️ ${text}` }),
     });
-    alert('تم إرسال التنبيه بنجاح، وسيصل للمندوب كإشعار فوري بصوت');
+    alert('تم إرسال التنبيه بنجاح، وسيصل للمندوب كإشعار فوري بصوت (بمجرد فتحه للتطبيق أو أثناء الدوام)');
   } catch (_) {
-    alert('تعذّر إرسال التنبيه');
+    alert('تعذّر إرسال التنبيه، تحقق من الاتصال');
   }
 }
+
+async function sendCustomAlert(driverId) {
+  const select = document.getElementById('alertReasonSelect');
+  const reason = alertReasons[select.value];
+  if (reason.text) {
+    await sendAlertMessage(driverId, reason.text);
+    return;
+  }
+  openGlobalAlertModal(driverId);
+}
 window.sendCustomAlert = sendCustomAlert;
+
+function renderGlobalAlertReasons() {
+  const select = document.getElementById('globalAlertReasonSelect');
+  select.innerHTML = alertReasons.map((r, i) => `<option value="${i}">${r.label}</option>`).join('');
+  select.value = alertReasons.length - 1;
+  document.getElementById('globalAlertCustomTextWrap').style.display = alertReasons[select.value].text ? 'none' : 'block';
+}
+
+function renderGlobalAlertDriversList(filter = '') {
+  const select = document.getElementById('globalAlertDriverSelect');
+  const f = filter.trim().toLowerCase();
+  const list = Object.entries(driversInfo).filter(
+    ([id, info]) =>
+      !f ||
+      info.name?.toLowerCase().includes(f) ||
+      info.driverCode?.toLowerCase().includes(f) ||
+      info.phone?.includes(f)
+  );
+  select.innerHTML = list
+    .map(([id, info]) => `<option value="${id}">${info.name || 'بدون اسم'} — #${info.driverCode || ''} — ${info.phone || ''}</option>`)
+    .join('');
+}
+
+function openGlobalAlertModal(preselectDriverId) {
+  document.getElementById('globalAlertSearch').value = '';
+  renderGlobalAlertDriversList();
+  renderGlobalAlertReasons();
+  if (preselectDriverId) {
+    document.getElementById('globalAlertDriverSelect').value = preselectDriverId;
+  }
+  document.getElementById('globalAlertModal').classList.remove('hidden');
+}
+
+document.getElementById('openGlobalAlertBtn').addEventListener('click', () => openGlobalAlertModal());
+document.getElementById('closeGlobalAlertModal').addEventListener('click', () => {
+  document.getElementById('globalAlertModal').classList.add('hidden');
+});
+
+document.getElementById('globalAlertSearch').addEventListener('input', (e) => renderGlobalAlertDriversList(e.target.value));
+
+document.getElementById('globalAlertReasonSelect').addEventListener('change', (e) => {
+  const reason = alertReasons[e.target.value];
+  document.getElementById('globalAlertCustomTextWrap').style.display = reason.text ? 'none' : 'block';
+});
+
+document.getElementById('globalAlertSendBtn').addEventListener('click', async () => {
+  const driverId = document.getElementById('globalAlertDriverSelect').value;
+  if (!driverId) return alert('اختر مندوبًا أولًا من القائمة');
+
+  const reasonIndex = document.getElementById('globalAlertReasonSelect').value;
+  const reason = alertReasons[reasonIndex];
+  let text = reason.text;
+  if (!text) {
+    text = document.getElementById('globalAlertCustomText').value.trim();
+    if (!text) return alert('اكتب نص الرسالة المخصصة أولًا');
+  }
+
+  await sendAlertMessage(driverId, text);
+  document.getElementById('globalAlertModal').classList.add('hidden');
+});
 
 window.openDriverDetails = function (driverId) {
   const info = driversInfo[driverId] || {};
