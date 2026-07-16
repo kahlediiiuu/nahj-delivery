@@ -63,7 +63,10 @@ router.post('/driver/login', async (req, res) => {
     const driver = driverDoc.data();
 
     if (driver.status === 'suspended') {
-      return res.status(403).json({ success: false, message: 'تم إيقاف هذا الحساب، تواصل مع الإدارة' });
+      return res.status(403).json({ success: false, message: driver.suspendReason ? `تم إيقاف هذا الحساب: ${driver.suspendReason}` : 'تم إيقاف هذا الحساب، تواصل مع الإدارة' });
+    }
+    if (driver.disableLogin === true) {
+      return res.status(403).json({ success: false, message: 'تم تعطيل تسجيل الدخول لهذا الحساب مؤقتاً، تواصل مع الإدارة' });
     }
 
     const valid = await bcrypt.compare(password, driver.passwordHash);
