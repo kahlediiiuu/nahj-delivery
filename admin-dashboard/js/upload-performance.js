@@ -16,16 +16,21 @@ async function loadDrivers() {
 }
 loadDrivers();
 
-document.getElementById('reportDate').valueAsDate = new Date();
+const yesterday = new Date(Date.now() - 86400000);
+document.getElementById('reportDate').valueAsDate = yesterday;
 
-// محاولة مطابقة تلقائية بالاسم بين الملف والمناديب المسجّلين
-function guessDriverId(rawName) {
+function guessDriverId(rawName, rowValues) {
+  const allValuesText = rowValues.map((v) => String(v).trim().toLowerCase()).join(' | ');
+
+  const byCode = driversList.find(
+    (d) => d.matchCode && allValuesText.includes(String(d.matchCode).trim().toLowerCase())
+  );
+  if (byCode) return byCode.id;
+
   if (!rawName) return '';
   const clean = String(rawName).trim().toLowerCase();
-  const match = driversList.find(
-    (d) => d.name && d.name.trim().toLowerCase() === clean
-  );
-  return match ? match.id : '';
+  const byName = driversList.find((d) => d.name && d.name.trim().toLowerCase() === clean);
+  return byName ? byName.id : '';
 }
 
 document.getElementById('fileInput').addEventListener('change', (e) => {
@@ -39,9 +44,9 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
 
-    // نحاول التعرف تلقائياً على الأعمدة الشائعة بأي تسمية عربية أو إنجليزية محتملة
     parsedRows = rows.map((row) => {
       const keys = Object.keys(row);
+      const values = Object.values(row);
       const findVal = (patterns) => {
         const key = keys.find((k) => patterns.some((p) => k.toLowerCase().includes(p)));
         return key ? row[key] : '';
@@ -49,12 +54,11 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
       const name = findVal(['اسم', 'name', 'مندوب', 'driver']);
       return {
         rawName: name,
-        driverId: guessDriverId(name),
+        driverId: guessDriverId(name, values),
         ordersAccepted: Number(findVal(['مقبول', 'accept', 'قبول'])) || 0,
         ordersRejected: Number(findVal(['مرفوض', 'reject', 'رفض'])) || 0,
         verificationCount: Number(findVal(['تحقق', 'verif'])) || 0,
-        categoryLabel: findVal(['فئة', 'category', 'تقييم', 'rating']) || '',
-        categoryColor: 'gray',
+        grade: '',
       };
     });
 
@@ -64,12 +68,20 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
   reader.readAsArrayBuffer(file);
 });
 
+const gradeOptions = [
+  { value: '', label: '— اختر الفئة —' },
+  { value: 'A', label: '👑 A - نخبة متميزة' },
+  { value: 'B', label: '🥈 B - أداء جيد جدًا' },
+  { value: 'C', label: '🥉 C - أداء متوسط' },
+  { value: 'D', label: '⚠️ D - قائمة المتابعة' },
+];
+
 function renderPreview() {
   const tbody = document.getElementById('previewBody');
   tbody.innerHTML = parsedRows
     .map(
       (row, i) => `
-    <tr>
+    <tr style="${row.driverId ? '' : 'background:#fef2f2;'}">
       <td>${row.rawName}</td>
       <td>
         <select onchange="updateRow(${i}, 'driverId', this.value)">
@@ -77,16 +89,12 @@ function renderPreview() {
           ${driversList.map((d) => `<option value="${d.id}" ${row.driverId === d.id ? 'selected' : ''}>${d.name} (#${d.driverCode})</option>`).join('')}
         </select>
       </td>
-      <td><input type="number" value="${row.ordersAccepted}" onchange="updateRow(${i}, 'ordersAccepted', this.value)"></td>
-      <td><input type="number" value="${row.ordersRejected}" onchange="updateRow(${i}, 'ordersRejected', this.value)"></td>
-      <td><input type="number" value="${row.verificationCount}" onchange="updateRow(${i}, 'verificationCount', this.value)"></td>
-      <td><input type="text" value="${row.categoryLabel}" onchange="updateRow(${i}, 'categoryLabel', this.value)"></td>
+      <td><input type="number" value="${row.ordersAccepted}" onchange="updateRow(${i}, 'ordersAccepted', this.value)" style="width:70px"></td>
+      <td><input type="number" value="${row.ordersRejected}" onchange="updateRow(${i}, 'ordersRejected', this.value)" style="width:70px"></td>
+      <td><input type="number" value="${row.verificationCount}" onchange="updateRow(${i}, 'verificationCount', this.value)" style="width:70px"></td>
       <td>
-        <select onchange="updateRow(${i}, 'categoryColor', this.value)">
-          <option value="gray" ${row.categoryColor === 'gray' ? 'selected' : ''}>عادي</option>
-          <option value="green" ${row.categoryColor === 'green' ? 'selected' : ''}>🟢 ممتاز</option>
-          <option value="yellow" ${row.categoryColor === 'yellow' ? 'selected' : ''}>🟡 متوسط</option>
-          <option value="red" ${row.categoryColor === 'red' ? 'selected' : ''}>🔴 خطر</option>
+        <select onchange="updateRow(${i}, 'grade', this.value)">
+          ${gradeOptions.map((g) => `<option value="${g.value}" ${row.grade === g.value ? 'selected' : ''}>${g.label}</option>`).join('')}
         </select>
       </td>
     </tr>`
@@ -104,7 +112,7 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
   const validRows = parsedRows.filter((r) => r.driverId);
 
   if (validRows.length === 0) {
-    msg.textContent = 'لم يتم ربط أي صف بمندوب، تأكد من اختيار المندوب لكل صف';
+    msg.textContent = 'لم يتم ربط أي صف بمندوب، تأكد من اختيار المندوب لكل صف (أو ضبط رمز المطابقة له من صفحة إدارة المناديب)';
     msg.style.color = '#dc2626';
     return;
   }
@@ -117,7 +125,7 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
     });
     const data = await res.json();
     if (data.success) {
-      msg.textContent = `تم رفع تقرير ${data.count} مندوب بنجاح ليوم ${date}.`;
+      msg.textContent = `تم رفع تقرير ${data.count} مندوب بنجاح ليوم ${date}، ووصلهم إشعار فوري بذلك.`;
       msg.style.color = '#16a34a';
     } else {
       msg.textContent = data.message || 'حدث خطأ';
