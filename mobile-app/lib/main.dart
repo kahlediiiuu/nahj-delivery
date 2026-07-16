@@ -2,20 +2,33 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'services/location_service.dart';
 import 'services/app_strings.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/permission_gate_screen.dart';
 
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // لا حاجة لأي كود هنا: نظام أندرويد نفسه يعرض الإشعار تلقائيًا
+}
+
 Future<void> main() async {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
-    // التقاط أي خطأ من إطار عمل Flutter نفسه (بما فيه أخطاء البناء والواجهة)
     FlutterError.onError = (FlutterErrorDetails details) async {
       await _saveCrashLog('Flutter Error: ${details.exceptionAsString()}\n${details.stack}');
     };
+
+    try {
+      await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    } catch (e, st) {
+      await _saveCrashLog('فشل تهيئة الإشعارات: $e\n$st');
+    }
 
     try {
       await LocationService.initialize();
@@ -26,7 +39,6 @@ Future<void> main() async {
     await AppStrings.loadSavedLanguage();
     runApp(const NahjDeliveryApp());
   }, (error, stack) async {
-    // التقاط أي خطأ غير متزامن (Async) لم يُلتقط بأي مكان آخر - هذا غالبًا سبب "الانهيار الصامت"
     await _saveCrashLog('خطأ غير متزامن (Uncaught): $error\n$stack');
   });
 }
@@ -36,9 +48,7 @@ Future<void> _saveCrashLog(String message) async {
     final prefs = await SharedPreferences.getInstance();
     final time = DateTime.now().toIso8601String();
     await prefs.setString('last_crash_log', '[$time]\n$message');
-  } catch (_) {
-    // لا شيء يمكن فعله إن فشل حتى التسجيل نفسه
-  }
+  } catch (_) {}
 }
 
 class NahjDeliveryApp extends StatelessWidget {
@@ -78,7 +88,6 @@ class NahjDeliveryApp extends StatelessWidget {
   }
 }
 
-/// يتحقق إن كان هناك جلسة محفوظة مسبقاً وينقل المستخدم للشاشة المناسبة
 class _StartupRouter extends StatelessWidget {
   const _StartupRouter();
 
