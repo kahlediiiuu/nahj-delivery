@@ -7,6 +7,8 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
   window.location.href = 'login.html';
 });
 
+let currentDrivers = [];
+
 async function loadDrivers() {
   const search = document.getElementById('searchInput').value;
   const status = document.getElementById('statusFilter').value;
@@ -18,27 +20,41 @@ async function loadDrivers() {
   const data = await res.json();
   if (!data.success) return alert(data.message || 'خطأ في جلب البيانات');
 
+  currentDrivers = data.drivers;
   const tbody = document.getElementById('driversTableBody');
   tbody.innerHTML = data.drivers
-    .map(
-      (d) => `
+    .map((d) => {
+      const statusBadge = d.status === 'suspended'
+        ? `<span class="badge badge-suspended" title="${d.suspendReason || ''}">موقوف${d.suspendReason ? ' 🛈' : ''}</span>`
+        : '<span class="badge badge-active">نشط</span>';
+      const loginBadge = d.disableLogin ? '<span class="badge badge-suspended">دخول معطّل</span>' : '';
+      const reportsBadge = d.hideReports ? '<span class="badge badge-suspended">تقارير مخفية</span>' : '';
+
+      return `
     <tr>
       <td style="font-family:monospace;font-size:12px;color:#64748b;">${d.id}</td>
       <td>${d.name || ''}</td>
       <td>${d.driverCode || ''}</td>
       <td>${d.phone || ''}</td>
-      <td><span class="badge ${d.status === 'suspended' ? 'badge-suspended' : 'badge-active'}">${d.status === 'suspended' ? 'موقوف' : 'نشط'}</span></td>
+      <td>${d.matchCode || '<span style="color:#94a3b8;">--</span>'}</td>
+      <td>${statusBadge} ${loginBadge} ${reportsBadge}</td>
       <td class="actions-cell">
-        <button class="btn btn-warning" onclick="openEditModal('${d.id}', '${(d.name || '').replace(/'/g, "")}', '${d.phone || ''}', '${d.driverCode || ''}')">تعديل</button>
+        <button class="btn btn-warning" onclick="openEditModal('${d.id}', '${(d.name || '').replace(/'/g, '')}', '${d.phone || ''}', '${d.driverCode || ''}', '${(d.matchCode || '').replace(/'/g, '')}')">تعديل</button>
         ${
           d.status === 'suspended'
             ? `<button class="btn btn-success" onclick="activateDriver('${d.id}')">تفعيل</button>`
             : `<button class="btn btn-warning" onclick="suspendDriver('${d.id}')">إيقاف</button>`
         }
-        <button class="btn btn-danger" onclick="deleteDriver('${d.id}', '${(d.name || '').replace(/'/g, "")}')">حذف</button>
+        <button class="btn ${d.disableLogin ? 'btn-success' : 'btn-warning'}" onclick="toggleLogin('${d.id}', ${!d.disableLogin})">
+          ${d.disableLogin ? 'تفعيل الدخول' : 'تعطيل الدخول'}
+        </button>
+        <button class="btn ${d.hideReports ? 'btn-success' : 'btn-warning'}" onclick="toggleReports('${d.id}', ${!d.hideReports})">
+          ${d.hideReports ? 'إظهار التقارير' : 'إخفاء التقارير'}
+        </button>
+        <button class="btn btn-danger" onclick="deleteDriver('${d.id}', '${(d.name || '').replace(/'/g, '')}')">حذف</button>
       </td>
-    </tr>`
-    )
+    </tr>`;
+    })
     .join('');
 }
 
@@ -46,7 +62,6 @@ document.getElementById('searchBtn').addEventListener('click', loadDrivers);
 document.getElementById('searchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') loadDrivers(); });
 document.getElementById('statusFilter').addEventListener('change', loadDrivers);
 
-// ------- نافذة الإضافة/التعديل -------
 const modal = document.getElementById('driverModal');
 
 document.getElementById('addBtn').addEventListener('click', () => {
@@ -55,6 +70,7 @@ document.getElementById('addBtn').addEventListener('click', () => {
   document.getElementById('inputName').value = '';
   document.getElementById('inputPhone').value = '';
   document.getElementById('inputCode').value = '';
+  document.getElementById('inputMatchCode').value = '';
   document.getElementById('inputPassword').value = '';
   document.getElementById('inputCode').disabled = false;
   document.getElementById('passwordLabel').style.display = 'block';
@@ -63,13 +79,14 @@ document.getElementById('addBtn').addEventListener('click', () => {
   modal.classList.remove('hidden');
 });
 
-window.openEditModal = function (id, name, phone, code) {
+window.openEditModal = function (id, name, phone, code, matchCode) {
   document.getElementById('modalTitle').textContent = 'تعديل بيانات المندوب';
   document.getElementById('editDriverId').value = id;
   document.getElementById('inputName').value = name;
   document.getElementById('inputPhone').value = phone;
   document.getElementById('inputCode').value = code;
-  document.getElementById('inputCode').disabled = true; // لا يمكن تغيير رقم المندوب بعد إنشائه
+  document.getElementById('inputMatchCode').value = matchCode || '';
+  document.getElementById('inputCode').disabled = true;
   document.getElementById('passwordLabel').style.display = 'none';
   document.getElementById('inputPassword').style.display = 'none';
   document.getElementById('modalError').textContent = '';
@@ -83,6 +100,7 @@ document.getElementById('saveDriverBtn').addEventListener('click', async () => {
   const name = document.getElementById('inputName').value.trim();
   const phone = document.getElementById('inputPhone').value.trim();
   const code = document.getElementById('inputCode').value.trim();
+  const matchCode = document.getElementById('inputMatchCode').value.trim();
   const password = document.getElementById('inputPassword').value;
   const errorEl = document.getElementById('modalError');
 
@@ -91,20 +109,28 @@ document.getElementById('saveDriverBtn').addEventListener('click', async () => {
   try {
     let res;
     if (id) {
-      // تعديل
       res = await fetch(`${API_URL}/drivers/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name, phone }),
+        body: JSON.stringify({ name, phone, matchCode }),
       });
     } else {
-      // إضافة
       if (!code || !password) return (errorEl.textContent = 'رقم المندوب وكلمة المرور مطلوبان');
       res = await fetch(`${API_URL}/drivers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ name, phone, driverCode: code, password }),
       });
+      if (res.ok && matchCode) {
+        const created = await res.clone().json();
+        if (created.id) {
+          await fetch(`${API_URL}/drivers/${created.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ matchCode }),
+          });
+        }
+      }
     }
 
     const data = await res.json();
@@ -119,15 +145,37 @@ document.getElementById('saveDriverBtn').addEventListener('click', async () => {
   }
 });
 
-// ------- إيقاف / تفعيل / حذف -------
 window.suspendDriver = async function (id) {
-  if (!confirm('هل تريد إيقاف حساب هذا المندوب؟')) return;
-  await fetch(`${API_URL}/drivers/${id}/suspend`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } });
+  const reason = prompt('سبب الإيقاف (اختياري، سيظهر للمندوب إن حاول الدخول):', '');
+  if (reason === null) return;
+  await fetch(`${API_URL}/drivers/${id}/suspend`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ reason }),
+  });
   loadDrivers();
 };
 
 window.activateDriver = async function (id) {
   await fetch(`${API_URL}/drivers/${id}/activate`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } });
+  loadDrivers();
+};
+
+window.toggleLogin = async function (id, disableLogin) {
+  await fetch(`${API_URL}/drivers/${id}/toggle-login`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ disableLogin }),
+  });
+  loadDrivers();
+};
+
+window.toggleReports = async function (id, hideReports) {
+  await fetch(`${API_URL}/drivers/${id}/toggle-reports`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ hideReports }),
+  });
   loadDrivers();
 };
 
