@@ -3,7 +3,13 @@ const router = express.Router();
 const { db } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 
-// المشرف يرفع تقرير الأداء اليومي (بعد استخراجه من ملف Excel في المتصفح)
+const gradeInfo = {
+  A: { emoji: '👑', label: 'نخبة متميزة (A)', color: 'green' },
+  B: { emoji: '🥈', label: 'أداء جيد جدًا (B)', color: 'green' },
+  C: { emoji: '🥉', label: 'أداء متوسط (C)', color: 'yellow' },
+  D: { emoji: '⚠️', label: 'يحتاج تحسينًا - قائمة المتابعة (D)', color: 'red' },
+};
+
 router.post('/upload', verifyToken, requireAdmin, async (req, res) => {
   try {
     const { date, records } = req.body;
@@ -13,20 +19,40 @@ router.post('/upload', verifyToken, requireAdmin, async (req, res) => {
 
     const batchWrites = records.map((r) => {
       if (!r.driverId) return null;
+      const grade = gradeInfo[r.grade] ? r.grade : null;
       return db.collection('dailyPerformance').doc(`${r.driverId}_${date}`).set({
         driverId: r.driverId,
         date,
         ordersAccepted: r.ordersAccepted || 0,
         ordersRejected: r.ordersRejected || 0,
         verificationCount: r.verificationCount || 0,
-        categoryLabel: r.categoryLabel || '',
-        categoryColor: r.categoryColor || 'gray', // green | yellow | red | gray
+        categoryLabel: grade ? gradeInfo[grade].label : (r.categoryLabel || ''),
+        categoryColor: grade ? gradeInfo[grade].color : (r.categoryColor || 'gray'),
+        grade: grade || null,
         notes: r.notes || '',
         uploadedAt: Date.now(),
       });
     }).filter(Boolean);
 
     await Promise.all(batchWrites);
+
+    const notifyWrites = records.map((r) => {
+      if (!r.driverId) return null;
+      const grade = gradeInfo[r.grade];
+      const gradeText = grade ? `${grade.emoji} تصنيفك: ${grade.label}` : '';
+      const text = `📊 تقريرك ليوم ${date} جاهز الآن!\n${gradeText}\n✅ مقبولة: ${r.ordersAccepted || 0} | ❌ مرفوضة: ${r.ordersRejected || 0}`;
+      return db.collection('messages').add({
+        driverId: r.driverId,
+        sender: 'admin',
+        text,
+        createdAt: Date.now(),
+        readByAdmin: true,
+        readByDriver: false,
+      });
+    }).filter(Boolean);
+
+    await Promise.all(notifyWrites);
+
     res.json({ success: true, count: batchWrites.length });
   } catch (err) {
     console.error(err);
@@ -34,7 +60,6 @@ router.post('/upload', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
-// المشرف يستعرض تقارير يوم معيّن لكل المناديب (لمراجعتها بعد الرفع)
 router.get('/day', verifyToken, requireAdmin, async (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().slice(0, 10);
@@ -47,7 +72,6 @@ router.get('/day', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
-// المندوب يستعرض تقرير أدائه الخاص ليوم معيّن
 router.get('/my', verifyToken, async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
