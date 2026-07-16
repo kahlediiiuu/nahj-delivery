@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../services/api_service.dart';
 import '../services/location_service.dart';
 import '../services/app_strings.dart';
@@ -57,8 +58,49 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  final _notificationsPlugin = FlutterLocalNotificationsPlugin();
+  bool _notificationsReady = false;
+
+  Future<void> _ensureNotificationChannel() async {
+    if (_notificationsReady) return;
+    const channel = AndroidNotificationChannel(
+      'nahj_messages_channel',
+      'رسائل نهج للتوصيل',
+      description: 'إشعار عند وصول رسالة جديدة من الإدارة',
+      importance: Importance.high,
+      playSound: true,
+    );
+    await _notificationsPlugin.initialize(
+      const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
+    );
+    await _notificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+    _notificationsReady = true;
+  }
+
+  bool _firstUnreadCheck = true;
+
   Future<void> _refreshUnread() async {
+    await _ensureNotificationChannel();
     final count = await ApiService.getUnreadMessageCount();
+    if (!_firstUnreadCheck && count > _unreadMessages) {
+      await _notificationsPlugin.show(
+        901,
+        'رسالة جديدة من الإدارة',
+        'لديك رسالة جديدة، اضغط لعرضها',
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'nahj_messages_channel',
+            'رسائل نهج للتوصيل',
+            importance: Importance.high,
+            priority: Priority.high,
+            playSound: true,
+          ),
+        ),
+      );
+    }
+    _firstUnreadCheck = false;
     if (mounted) setState(() => _unreadMessages = count);
   }
 
