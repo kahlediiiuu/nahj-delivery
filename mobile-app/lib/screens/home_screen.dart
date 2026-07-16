@@ -31,10 +31,24 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadName();
+    _syncShiftStatus();
     _refreshUnread();
     _checkLastCrash();
     _setupPushNotifications();
     _unreadTimer = Timer.periodic(const Duration(seconds: 15), (_) => _refreshUnread());
+  }
+
+  Future<void> _syncShiftStatus() async {
+    try {
+      final result = await ApiService.getMyReport();
+      final reallyOnShift = result['onShift'] == true;
+      if (mounted) setState(() => _onShift = reallyOnShift);
+      if (reallyOnShift) {
+        try {
+          await LocationService.start();
+        } catch (_) {}
+      }
+    } catch (_) {}
   }
 
   Future<void> _setupPushNotifications() async {
@@ -136,12 +150,22 @@ class _HomeScreenState extends State<HomeScreen> {
       importance: Importance.high,
       playSound: true,
     );
+    const silentChannel = AndroidNotificationChannel(
+      'nahj_messages_silent_channel',
+      'رسائل نهج للتوصيل (بدون صوت)',
+      description: 'إشعار نصي عادي بدون صوت',
+      importance: Importance.high,
+      playSound: false,
+    );
     await _notificationsPlugin.initialize(
       const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
     );
     await _notificationsPlugin
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
+    await _notificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(silentChannel);
     _notificationsReady = true;
   }
 
