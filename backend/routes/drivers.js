@@ -4,10 +4,8 @@ const bcrypt = require('bcryptjs');
 const { db } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 
-// كل مسارات هذا الملف للمشرف فقط
 router.use(verifyToken, requireAdmin);
 
-// جلب كل المناديب (مع فلترة وبحث اختياريين)
 router.get('/', async (req, res) => {
   try {
     const { search, status } = req.query;
@@ -34,7 +32,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// إضافة مندوب جديد
 router.post('/', async (req, res) => {
   try {
     const { name, phone, driverCode, password } = req.body;
@@ -65,13 +62,13 @@ router.post('/', async (req, res) => {
   }
 });
 
-// تعديل بيانات مندوب
 router.put('/:id', async (req, res) => {
   try {
-    const { name, phone } = req.body;
+    const { name, phone, matchCode } = req.body;
     const updates = {};
     if (name) updates.name = name;
     if (phone) updates.phone = phone;
+    if (matchCode !== undefined) updates.matchCode = matchCode;
     await db.collection('drivers').doc(req.params.id).update(updates);
     res.json({ success: true });
   } catch (err) {
@@ -80,19 +77,16 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// إيقاف الحساب
 router.patch('/:id/suspend', async (req, res) => {
   await db.collection('drivers').doc(req.params.id).update({ status: 'suspended' });
   res.json({ success: true });
 });
 
-// إعادة التفعيل
 router.patch('/:id/activate', async (req, res) => {
   await db.collection('drivers').doc(req.params.id).update({ status: 'active' });
   res.json({ success: true });
 });
 
-// حذف مندوب نهائياً
 router.delete('/:id', async (req, res) => {
   await db.collection('drivers').doc(req.params.id).delete();
   res.json({ success: true });
