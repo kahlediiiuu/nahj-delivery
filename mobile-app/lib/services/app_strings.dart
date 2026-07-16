@@ -1,10 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// نظام ترجمة مبسّط جداً (بدون أدوات بناء معقدة قد تفشل عند التثبيت).
-/// كل مندوب يختار لغته من شاشة الدخول أول مرة، وتُحفظ في جهازه فقط.
 class AppStrings {
-  // ValueNotifier يجعل الواجهة تتحدث فوراً عند تغيير اللغة، بدون إعادة تشغيل التطبيق
   static final ValueNotifier<String> languageNotifier = ValueNotifier('ar');
   static String get currentLang => languageNotifier.value;
 
@@ -25,10 +22,24 @@ class AppStrings {
     'password': {'ar': 'كلمة المرور', 'en': 'Password', 'bn': 'পাসওয়ার্ড'},
     'login': {'ar': 'تسجيل الدخول', 'en': 'Login', 'bn': 'লগইন'},
     'chooseLanguage': {'ar': 'اختر لغتك', 'en': 'Choose your language', 'bn': 'আপনার ভাষা নির্বাচন করুন'},
-    'startShift': {'ar': 'بدء الدوام', 'en': 'Start Shift', 'bn': 'শিফট শুরু করুন'},
-    'endShift': {'ar': 'إنهاء الدوام', 'en': 'End Shift', 'bn': 'শিফট শেষ করুন'},
-    'onShift': {'ar': 'أنت الآن في وضع العمل', 'en': 'You are currently on shift', 'bn': 'আপনি এখন কাজে আছেন'},
-    'offShift': {'ar': 'لست في وضع العمل حالياً', 'en': 'You are not on shift', 'bn': 'আপনি কাজে নেই'},
+    'startShift': {'ar': '✅ تسجيل الحضور', 'en': '✅ Check In', 'bn': '✅ চেক ইন'},
+    'endShift': {'ar': 'إنهاء يوم العمل', 'en': 'Check Out', 'bn': 'চেক আউট'},
+    'onShift': {'ar': 'أنت الآن ضمن سجل الحضور اليومي', 'en': 'You are checked in for today', 'bn': 'আপনি আজকের জন্য চেক ইন করেছেন'},
+    'offShift': {'ar': 'لم تسجّل حضورك اليوم بعد', 'en': 'You have not checked in today', 'bn': 'আপনি আজ চেক ইন করেননি'},
+    'requestLeave': {'ar': '🗓️ تقديم طلب إجازة', 'en': '🗓️ Request Leave', 'bn': '🗓️ ছুটির অনুরোধ'},
+    'leaveReason': {'ar': 'سبب الإجازة', 'en': 'Reason', 'bn': 'কারণ'},
+    'leaveReasonSick': {'ar': '🤒 مرض', 'en': '🤒 Sick', 'bn': '🤒 অসুস্থ'},
+    'leaveReasonEmergency': {'ar': '🚨 ظرف طارئ / حادث', 'en': '🚨 Emergency', 'bn': '🚨 জরুরি'},
+    'leaveReasonPersonal': {'ar': '👤 ظرف شخصي', 'en': '👤 Personal', 'bn': '👤 ব্যক্তিগত'},
+    'leaveReasonOther': {'ar': '📝 سبب آخر', 'en': '📝 Other', 'bn': '📝 অন্যান্য'},
+    'leaveDate': {'ar': 'تاريخ الإجازة المطلوبة', 'en': 'Requested date', 'bn': 'অনুরোধকৃত তারিখ'},
+    'leaveNote': {'ar': 'ملاحظة إضافية (اختياري)', 'en': 'Additional note (optional)', 'bn': 'অতিরিক্ত নোট (ঐচ্ছিক)'},
+    'submitLeaveRequest': {'ar': 'إرسال الطلب', 'en': 'Submit Request', 'bn': 'জমা দিন'},
+    'leaveRequestSent': {'ar': 'تم إرسال طلبك بنجاح، سيصلك الرد قريبًا', 'en': 'Request sent successfully', 'bn': 'অনুরোধ সফলভাবে পাঠানো হয়েছে'},
+    'myLeaveRequests': {'ar': 'طلباتي السابقة', 'en': 'My Requests', 'bn': 'আমার অনুরোধ'},
+    'leaveStatusPending': {'ar': '⏳ قيد المراجعة', 'en': '⏳ Pending', 'bn': '⏳ অপেক্ষমান'},
+    'leaveStatusApproved': {'ar': '✅ تمت الموافقة', 'en': '✅ Approved', 'bn': '✅ অনুমোদিত'},
+    'leaveStatusRejected': {'ar': '❌ مرفوض', 'en': '❌ Rejected', 'bn': '❌ প্রত্যাখ্যাত'},
     'gpsRequired': {
       'ar': 'الرجاء تفعيل خدمة الموقع (GPS) أولاً',
       'en': 'Please enable GPS first',
