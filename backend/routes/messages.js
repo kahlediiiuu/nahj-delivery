@@ -37,12 +37,13 @@ router.post('/', async (req, res) => {
       response: null,
     });
 
-    if (sender === 'admin') {
+   if (sender === 'admin') {
       await sendPushToDriver(
         driverId,
         requiresResponse ? '⚠️ تنبيه يتطلب ردك الفوري' : '📩 رسالة جديدة من الإدارة',
         text.trim(),
-        { messageId: docRef.id, requiresResponse: !!requiresResponse }
+        { messageId: docRef.id, requiresResponse: !!requiresResponse },
+        !requiresResponse && req.body.silent === true
       );
     }
 
