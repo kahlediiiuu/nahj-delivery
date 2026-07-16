@@ -1,137 +1,175 @@
-// إدارة خريطة OpenStreetMap عبر Leaflet وعلامات المناديب
-const map = L.map('map').setView([24.7136, 46.6753], 11); // قيمة مبدئية مؤقتة، سيتم تحديثها فورًا من نطاق العمل الفعلي أدناه
+const API_URL = NAHJ_API_URL;
+const SOCKET_URL = NAHJ_SOCKET_URL;
 
-// عند تحميل الصفحة، اجلب نطاق العمل الحقيقي المحفوظ ووسّط الخريطة عليه تلقائيًا
-(async function centerOnRealWorkZone() {
-  try {
-    const token = sessionStorage.getItem('nahj_admin_token');
-    const res = await fetch(`${window.NAHJ_API_URL}/settings/workzone`, {
-      headers: { Authorization: `Bearer ${token}` },
+const token = sessionStorage.getItem('nahj_admin_token');
+if (!token) window.location.href = 'login.html';
+
+document.getElementById('adminName').textContent = sessionStorage.getItem('nahj_admin_name') || '';
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  sessionStorage.clear();
+  window.location.href = 'login.html';
+});
+
+let driversInfo = {}; // driverId -> {name, phone, driverCode, ...}
+let latestLocations = {};
+
+async function loadDrivers() {
+  const res = await fetch(`${API_URL}/drivers`, { headers: { Authorization: `Bearer ${token}` } });
+  const data = await res.json();
+  if (data.success) {
+    driversInfo = {};
+    data.drivers.forEach((d) => (driversInfo[d.id] = d));
+    renderDriverList();
+  }
+}
+
+function renderDriverList(filter = '') {
+  const list = document.getElementById('driverList');
+  list.innerHTML = '';
+  const f = filter.trim().toLowerCase();
+
+  Object.entries(driversInfo)
+    .filter(([id, info]) => !f || info.name?.toLowerCase().includes(f) || info.driverCode?.toLowerCase().includes(f))
+    .forEach(([id, info]) => {
+      const loc = latestLocations[id];
+      const now = Date.now();
+      let statusClass = 'status-offline';
+      if (loc) {
+        if (loc.gpsEnabled === false) statusClass = 'status-gpsoff';
+        else if (now - loc.timestamp > 60000) statusClass = 'status-offline';
+        else if (loc.insideWorkZone === false) statusClass = 'status-outside';
+        else if (loc.status === 'stopped') statusClass = 'status-idle';
+        else statusClass = 'status-online';
+      }
+
+      const card = document.createElement('div');
+      card.className = `driver-card ${statusClass}`;
+      card.innerHTML = `
+        <div>
+          <div class="name">${info.name || 'بدون اسم'}</div>
+          <div class="meta">#${info.driverCode || ''} · ${info.phone || ''}</div>
+        </div>`;
+      card.addEventListener('click', () => openDriverDetails(id));
+      list.appendChild(card);
     });
-    const data = await res.json();
-    if (data.success && data.lat && data.lng) {
-      map.setView([data.lat, data.lng], 12);
-    }
-  } catch (_) {}
-})();
+}
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap contributors',
-  maxZoom: 19,
-}).addTo(map);
+document.getElementById('searchDriver').addEventListener('input', (e) => renderDriverList(e.target.value));
 
-const markers = {}; // driverId -> L.marker
+window.openDriverDetails = function (driverId) {
+  const info = driversInfo[driverId] || {};
+  const loc = latestLocations[driverId] || {};
+  const modal = document.getElementById('driverModal');
+  const body = document.getElementById('modalBody');
 
-function statusColor(loc) {
+  const shiftStart = info.shiftStart ? new Date(info.shiftStart).toLocaleTimeString('ar-SA') : '--';
+  const shiftEnd = info.shiftEnd ? new Date(info.shiftEnd).toLocaleTimeString('ar-SA') : '--';
+  const lastUpdate = loc.timestamp ? new Date(loc.timestamp).toLocaleTimeString('ar-SA') : '--';
+
+  body.innerHTML = `
+    <h3>${info.name || ''}</h3>
+    <div class="detail-row"><span>الرقم التعريفي الدائم</span><span style="font-family:monospace;font-size:12px;">${driverId}</span></div>
+    <div class="detail-row"><span>رقم المندوب</span><span>${info.driverCode || ''}</span></div>
+    <div class="detail-row"><span>رقم الجوال</span><span>${info.phone || ''}</span></div>
+    <div class="detail-row"><span>آخر تحديث</span><span>${lastUpdate}</span></div>
+    <div class="detail-row"><span>السرعة</span><span>${(loc.speed || 0).toFixed(1)} كم/س</span></div>
+    <div class="detail-row"><span>البطارية</span><span>${loc.battery ?? '--'}%${loc.isCharging ? ' (شحن)' : ''}</span></div>
+    <div class="detail-row"><span>حالة الإنترنت</span><span>${loc.isInternetConnected === false ? 'منقطع' : 'متصل'}</span></div>
+    <div class="detail-row"><span>حالة GPS</span><span>${loc.gpsEnabled === false ? 'مغلق' : 'مفعّل'}</span></div>
+    <div class="detail-row"><span>داخل النطاق</span><span>${loc.insideWorkZone === false ? 'لا (خارج النطاق)' : 'نعم'}</span></div>
+    <div class="detail-row"><span>بداية الدوام</span><span>${shiftStart}</span></div>
+    <div class="detail-row"><span>نهاية الدوام</span><span>${shiftEnd}</span></div>
+  `;
+  modal.classList.remove('hidden');
+};
+
+document.getElementById('closeModal').addEventListener('click', () => {
+  document.getElementById('driverModal').classList.add('hidden');
+});
+
+function updateStatsBar() {
   const now = Date.now();
-  if (loc.gpsEnabled === false) return { color: '#111827', label: 'GPS مغلق' };
-  if (now - loc.timestamp > 60000) return { color: '#dc2626', label: 'غير متصل' };
-  if (loc.insideWorkZone === false) return { color: '#2563eb', label: 'خارج النطاق' };
-  if (loc.status === 'stopped') return { color: '#eab308', label: 'لا توجد حركة' };
-  return { color: '#16a34a', label: 'متصل' };
-}
+  let online = 0, offline = 0, inside = 0, outside = 0, moving = 0, stopped = 0;
 
-function formatDuration(ms) {
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return 'الآن';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `منذ ${minutes} دقيقة`;
-  const hours = Math.floor(minutes / 60);
-  const remMinutes = minutes % 60;
-  return `منذ ${hours} ساعة${remMinutes > 0 ? ` و${remMinutes} دقيقة` : ''}`;
-}
-
-function makeIcon(color) {
-  return L.divIcon({
-    className: '',
-    html: `<div style="background:${color};width:18px;height:18px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 4px rgba(0,0,0,.4)"></div>`,
-    iconSize: [18, 18],
+  Object.values(latestLocations).forEach((loc) => {
+    if (now - loc.timestamp <= 60000) online++; else offline++;
+    if (loc.insideWorkZone === false) outside++; else inside++;
+    if (loc.status === 'moving') moving++; else stopped++;
   });
+
+  document.getElementById('statOnline').textContent = online;
+  document.getElementById('statOffline').textContent = offline;
+  document.getElementById('statInside').textContent = inside;
+  document.getElementById('statOutside').textContent = outside;
+  document.getElementById('statMoving').textContent = moving;
+  document.getElementById('statStopped').textContent = stopped;
 }
 
-function updateMarkers(locations, driversInfo) {
-  const now = Date.now();
-  window.lastLocationsData = locations;
-  window.lastDriversInfo = driversInfo;
+function showToast(text) {
+  const container = document.getElementById('alertsToast');
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = text;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 6000);
+}
 
-  for (const [driverId, loc] of Object.entries(locations)) {
-    const { color, label } = statusColor(loc);
-    const info = driversInfo[driverId] || {};
-    const sinceUpdate = now - (loc.timestamp || now);
-    const isOffline = sinceUpdate > 60000;
+function playAlertSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 880;
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.4);
+  } catch (_) {}
+}
 
-    const popupText = `
-      <b>${info.name || driverId}</b><br>
-      <span style="color:${color}">${label}</span><br>
-      السرعة: ${(loc.speed || 0).toFixed(1)} كم/س<br>
-      البطارية: ${loc.battery ?? '--'}%<br>
-      ${isOffline ? `<span style="color:#dc2626">آخر تحديث: ${formatDuration(sinceUpdate)}</span>` : 'آخر تحديث: الآن'}<br>
-      <a href="#" onclick="window.openDriverDetails && window.openDriverDetails('${driverId}'); return false;" style="color:#2563eb;">عرض التفاصيل الكاملة</a> |
-      <a href="reports.html?driverId=${driverId}&tab=replay" style="color:#16a34a;">متابعة مسار الحركة</a>
-    `;
+if ('Notification' in window && Notification.permission === 'default') {
+  document.body.addEventListener('click', () => Notification.requestPermission(), { once: true });
+}
 
-    if (markers[driverId]) {
-      markers[driverId].setLatLng([loc.lat, loc.lng]);
-      markers[driverId].setIcon(makeIcon(color));
-      markers[driverId].setPopupContent(popupText);
-    } else {
-      markers[driverId] = L.marker([loc.lat, loc.lng], { icon: makeIcon(color) })
-        .addTo(map)
-        .bindPopup(popupText)
-        .on('click', () => window.openDriverDetails && window.openDriverDetails(driverId));
-    }
-  }
-
-  for (const driverId of Object.keys(markers)) {
-    if (!(driverId in locations)) {
-      map.removeLayer(markers[driverId]);
-      delete markers[driverId];
-    }
+function showBrowserNotification(text) {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('⚠️ تنبيه نهج للتوصيل', { body: text, icon: '' });
   }
 }
 
-setInterval(() => {
-  if (window.lastLocationsData) {
-    updateMarkers(window.lastLocationsData, window.lastDriversInfo || {});
-  }
-}, 15000);
-
-const locateControl = L.control({ position: 'topleft' });
-locateControl.onAdd = function () {
-  const btn = L.DomUtil.create('button', 'locate-me-btn');
-  btn.innerHTML = '📍';
-  btn.title = 'تحديد موقعي الحالي';
-  btn.style.cssText = 'width:40px;height:40px;background:#fff;border:2px solid rgba(0,0,0,.2);border-radius:6px;font-size:20px;cursor:pointer;margin-bottom:6px;';
-  L.DomEvent.disableClickPropagation(btn);
-  btn.onclick = () => {
-    if (!navigator.geolocation) {
-      alert('المتصفح لا يدعم تحديد الموقع');
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], 15),
-      () => alert('تعذّر تحديد موقعك، تأكد من السماح بالوصول للموقع في المتصفح')
-    );
-  };
-  return btn;
+const alertMessages = {
+  no_update: (name) => `⚠️ ${name}: لم يُحدَّث الموقع منذ فترة`,
+  gps_off: (name) => `⚫ ${name}: تم إغلاق GPS`,
+  internet_off: (name) => `🔴 ${name}: انقطع الإنترنت`,
+  outside_zone: (name) => `🔵 ${name}: خرج عن نطاق العمل`,
+  low_battery: (name) => `🔋 ${name}: البطارية منخفضة`,
 };
-locateControl.addTo(map);
 
-const refreshControl = L.control({ position: 'topleft' });
-refreshControl.onAdd = function () {
-  const btn = L.DomUtil.create('button', 'refresh-now-btn');
-  btn.innerHTML = '🔄';
-  btn.title = 'تحديث الآن';
-  btn.style.cssText = 'width:40px;height:40px;background:#fff;border:2px solid rgba(0,0,0,.2);border-radius:6px;font-size:20px;cursor:pointer;';
-  L.DomEvent.disableClickPropagation(btn);
-  btn.onclick = () => {
-    if (window.nahjSocket) {
-      window.nahjSocket.emit('request:locations');
+const socket = io(SOCKET_URL);
+window.nahjSocket = socket;
+
+socket.on('locations:update', (locations) => {
+  latestLocations = locations;
+  updateMarkers(locations, driversInfo);
+  updateStatsBar();
+  renderDriverList(document.getElementById('searchDriver').value);
+});
+
+socket.on('alerts:new', (alerts) => {
+  if (alerts.length > 0) playAlertSound();
+  alerts.forEach((a) => {
+    const name = driversInfo[a.driverId]?.name || a.driverId;
+    const msgFn = alertMessages[a.type];
+    if (msgFn) {
+      const text = msgFn(name);
+      showToast(text);
+      showBrowserNotification(text);
     }
-    btn.style.transform = 'rotate(360deg)';
-    btn.style.transition = 'transform .5s';
-    setTimeout(() => { btn.style.transform = ''; btn.style.transition = ''; }, 500);
-  };
-  return btn;
-};
-refreshControl.addTo(map);
+  });
+});
+
+loadDrivers();
+setInterval(loadDrivers, 60000);
