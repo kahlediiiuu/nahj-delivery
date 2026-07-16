@@ -56,15 +56,46 @@ function renderDriverList(filter = '') {
 
 document.getElementById('searchDriver').addEventListener('input', (e) => renderDriverList(e.target.value));
 
+const alertReasons = [
+  { label: '📍 أنت بعيد عن منطقة العمل المحددة', text: 'تنبيه: يبدو أنك بعيد عن منطقة العمل المحددة، الرجاء التأكد من موقعك.' },
+  { label: '⏱️ يجب الإسراع في توصيل الطلبات', text: 'تنبيه: لاحظنا تأخرًا في توصيل الطلبات، الرجاء الإسراع.' },
+  { label: '⚠️ لاحظنا تأخرك عن الجدول', text: 'تنبيه: لاحظنا تأخرك عن الجدول المعتاد اليوم.' },
+  { label: '🔋 الرجاء شحن جوالك', text: 'تنبيه: بطارية جوالك منخفضة جدًا، الرجاء شحنه في أقرب وقت.' },
+  { label: '📶 الرجاء التحقق من اتصال الإنترنت', text: 'تنبيه: يبدو أن اتصالك بالإنترنت غير مستقر.' },
+  { label: '✍️ رسالة أخرى مخصصة', text: '' },
+];
+
+async function sendCustomAlert(driverId) {
+  const select = document.getElementById('alertReasonSelect');
+  const reason = alertReasons[select.value];
+  let text = reason.text;
+  if (!text) {
+    text = prompt('اكتب نص التنبيه المخصص:');
+    if (!text) return;
+  }
+  try {
+    await fetch(`${API_URL}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ driverId, text: `⚠️ ${text}` }),
+    });
+    alert('تم إرسال التنبيه بنجاح، وسيصل للمندوب كإشعار فوري بصوت');
+  } catch (_) {
+    alert('تعذّر إرسال التنبيه');
+  }
+}
+window.sendCustomAlert = sendCustomAlert;
+
 window.openDriverDetails = function (driverId) {
   const info = driversInfo[driverId] || {};
   const loc = latestLocations[driverId] || {};
   const modal = document.getElementById('driverModal');
   const body = document.getElementById('modalBody');
 
-  const shiftStart = info.shiftStart ? new Date(info.shiftStart).toLocaleTimeString('ar-SA') : '--';
-  const shiftEnd = info.shiftEnd ? new Date(info.shiftEnd).toLocaleTimeString('ar-SA') : '--';
-  const lastUpdate = loc.timestamp ? new Date(loc.timestamp).toLocaleTimeString('ar-SA') : '--';
+  const dateTimeOptions = { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+  const shiftStart = info.shiftStart ? new Date(info.shiftStart).toLocaleString('ar-SA', dateTimeOptions) : '--';
+  const shiftEnd = info.shiftEnd ? new Date(info.shiftEnd).toLocaleString('ar-SA', dateTimeOptions) : '--';
+  const lastUpdate = loc.timestamp ? new Date(loc.timestamp).toLocaleString('ar-SA', dateTimeOptions) : '--';
 
   body.innerHTML = `
     <h3>${info.name || ''}</h3>
@@ -77,8 +108,16 @@ window.openDriverDetails = function (driverId) {
     <div class="detail-row"><span>حالة الإنترنت</span><span>${loc.isInternetConnected === false ? 'منقطع' : 'متصل'}</span></div>
     <div class="detail-row"><span>حالة GPS</span><span>${loc.gpsEnabled === false ? 'مغلق' : 'مفعّل'}</span></div>
     <div class="detail-row"><span>داخل النطاق</span><span>${loc.insideWorkZone === false ? 'لا (خارج النطاق)' : 'نعم'}</span></div>
-    <div class="detail-row"><span>بداية الدوام</span><span>${shiftStart}</span></div>
-    <div class="detail-row"><span>نهاية الدوام</span><span>${shiftEnd}</span></div>
+    <div class="detail-row"><span>بداية الدوام (تاريخ ووقت)</span><span>${shiftStart}</span></div>
+    <div class="detail-row"><span>نهاية الدوام (تاريخ ووقت)</span><span>${shiftEnd}</span></div>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #e5e7eb;">
+    <div style="font-weight:bold;margin-bottom:8px;">📢 إرسال تنبيه فوري لهذا المندوب</div>
+    <select id="alertReasonSelect" style="width:100%;padding:8px;margin-bottom:8px;border-radius:6px;border:1px solid #cbd5e1;">
+      ${alertReasons.map((r, i) => `<option value="${i}">${r.label}</option>`).join('')}
+    </select>
+    <button onclick="window.sendCustomAlert('${driverId}')" style="width:100%;padding:10px;background:#0f172a;color:#fff;border:none;border-radius:6px;cursor:pointer;">
+      إرسال التنبيه الآن
+    </button>
   `;
   modal.classList.remove('hidden');
 };
