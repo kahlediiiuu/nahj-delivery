@@ -10,7 +10,7 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
   window.location.href = 'login.html';
 });
 
-let driversInfo = {}; // driverId -> {name, phone, driverCode, ...}
+let driversInfo = {};
 let latestLocations = {};
 
 async function loadDrivers() {
@@ -105,13 +105,20 @@ function updateStatsBar() {
   document.getElementById('statStopped').textContent = stopped;
 }
 
-function showToast(text) {
+function showToast(text, driverId) {
   const container = document.getElementById('alertsToast');
   const toast = document.createElement('div');
   toast.className = 'toast';
-  toast.textContent = text;
+  toast.textContent = text + ' (اضغط لاتخاذ إجراء)';
+  toast.style.cursor = 'pointer';
+  if (driverId) {
+    toast.addEventListener('click', () => {
+      window.openDriverDetails(driverId);
+      toast.remove();
+    });
+  }
   container.appendChild(toast);
-  setTimeout(() => toast.remove(), 6000);
+  setTimeout(() => toast.remove(), 8000);
 }
 
 function playAlertSound() {
@@ -165,7 +172,7 @@ socket.on('alerts:new', (alerts) => {
     const msgFn = alertMessages[a.type];
     if (msgFn) {
       const text = msgFn(name);
-      showToast(text);
+      showToast(text, a.driverId);
       showBrowserNotification(text);
     }
   });
