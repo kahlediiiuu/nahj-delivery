@@ -1,0 +1,101 @@
+const express = require('express');
+const router = express.Router();
+const bcrypt = require('bcryptjs');
+const { db } = require('../config/firebase');
+const { verifyToken, requireAdmin } = require('../middleware/auth');
+
+// كل مسارات هذا الملف للمشرف فقط
+router.use(verifyToken, requireAdmin);
+
+// جلب كل المناديب (مع فلترة وبحث اختياريين)
+router.get('/', async (req, res) => {
+  try {
+    const { search, status } = req.query;
+    let query = db.collection('drivers');
+    if (status) query = query.where('status', '==', status);
+
+    const snap = await query.get();
+    let drivers = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    if (search) {
+      const s = search.toLowerCase();
+      drivers = drivers.filter(
+        (d) =>
+          d.name?.toLowerCase().includes(s) ||
+          d.phone?.includes(s) ||
+          d.driverCode?.toLowerCase().includes(s)
+      );
+    }
+
+    res.json({ success: true, drivers });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+// إضافة مندوب جديد
+router.post('/', async (req, res) => {
+  try {
+    const { name, phone, driverCode, password } = req.body;
+    if (!name || !phone || !driverCode || !password) {
+      return res.status(400).json({ success: false, message: 'جميع الحقول مطلوبة' });
+    }
+
+    const existing = await db.collection('drivers').where('driverCode', '==', driverCode).limit(1).get();
+    if (!existing.empty) {
+      return res.status(409).json({ success: false, message: 'رقم المندوب مستخدم مسبقاً' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const docRef = await db.collection('drivers').add({
+      name,
+      phone,
+      driverCode,
+      passwordHash,
+      status: 'active',
+      online: false,
+      createdAt: Date.now(),
+    });
+
+    res.json({ success: true, id: docRef.id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+// تعديل بيانات مندوب
+router.put('/:id', async (req, res) => {
+  try {
+    const { name, phone } = req.body;
+    const updates = {};
+    if (name) updates.name = name;
+    if (phone) updates.phone = phone;
+    await db.collection('drivers').doc(req.params.id).update(updates);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+// إيقاف الحساب
+router.patch('/:id/suspend', async (req, res) => {
+  await db.collection('drivers').doc(req.params.id).update({ status: 'suspended' });
+  res.json({ success: true });
+});
+
+// إعادة التفعيل
+router.patch('/:id/activate', async (req, res) => {
+  await db.collection('drivers').doc(req.params.id).update({ status: 'active' });
+  res.json({ success: true });
+});
+
+// حذف مندوب نهائياً
+router.delete('/:id', async (req, res) => {
+  await db.collection('drivers').doc(req.params.id).delete();
+  res.json({ success: true });
+});
+
+module.exports = router;

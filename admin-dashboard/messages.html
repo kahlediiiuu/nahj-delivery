@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>الرسائل - نهج للتوصيل</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .chat-layout { display:flex; height:calc(100vh - 60px); }
+  .conv-list { width:300px; background:#fff; border-left:1px solid #e2e8f0; overflow-y:auto; }
+  .conv-item { padding:14px; border-bottom:1px solid #f1f5f9; cursor:pointer; }
+  .conv-item:hover { background:#f8fafc; }
+  .conv-item.active { background:#eef2ff; }
+  .conv-name { font-weight:600; font-size:14px; display:flex; justify-content:space-between; }
+  .conv-last { font-size:12px; color:#64748b; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .badge-unread { background:#dc2626; color:#fff; border-radius:10px; padding:1px 7px; font-size:11px; }
+  .chat-area { flex:1; display:flex; flex-direction:column; background:#f0f2f5; }
+  .chat-messages { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:8px; }
+  .msg-bubble { max-width:60%; padding:10px 14px; border-radius:14px; font-size:14px; }
+  .msg-admin { align-self:flex-start; background:#0f172a; color:#fff; border-bottom-left-radius:4px; }
+  .msg-driver { align-self:flex-end; background:#fff; border-bottom-right-radius:4px; }
+  .msg-time { font-size:10px; opacity:.6; margin-top:4px; }
+  .chat-input-row { display:flex; gap:8px; padding:14px; background:#fff; border-top:1px solid #e2e8f0; }
+  .chat-input-row input { flex:1; padding:10px; border:1px solid #cbd5e1; border-radius:8px; }
+  .chat-input-row button { padding:10px 20px; background:#0f172a; color:#fff; border:none; border-radius:8px; cursor:pointer; }
+  .empty-state { display:flex; align-items:center; justify-content:center; height:100%; color:#94a3b8; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h2>💬 الرسائل</h2>
+    <div class="topbar-right">
+      <a href="index.html" style="color:#fff;margin-left:16px;">← الخريطة المباشرة</a>
+      <button id="logoutBtn">خروج</button>
+    </div>
+  </div>
+
+  <div class="chat-layout">
+    <div class="conv-list" id="convList"></div>
+    <div class="chat-area">
+      <div class="chat-messages" id="chatMessages">
+        <div class="empty-state">اختر مندوباً من القائمة لبدء المحادثة</div>
+      </div>
+      <div class="chat-input-row" id="chatInputRow" style="display:none;">
+        <input type="text" id="messageInput" placeholder="اكتب رسالة...">
+        <button id="sendBtn">إرسال</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/messages.js"></script>
+</body>
+</html>

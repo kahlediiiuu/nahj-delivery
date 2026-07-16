@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // لا وصول مباشر من العميل - كل التعامل عبر الـ Backend API باستخدام Admin SDK
+    // هذا يمنع أي تلاعب من تطبيق المندوب أو لوحة التحكم مباشرة بقاعدة البيانات
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

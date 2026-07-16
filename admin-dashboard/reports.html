@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>التقارير - نهج للتوصيل</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .tabs { display:flex; gap:8px; padding:10px 20px; background:#fff; border-bottom:1px solid #e2e8f0; }
+  .tab-btn { padding:8px 16px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:8px; cursor:pointer; font-size:14px; }
+  .tab-btn.active { background:#0f172a; color:#fff; border-color:#0f172a; }
+  .tab-panel { display:none; padding:20px; }
+  .tab-panel.active { display:block; }
+  .controls-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+  .controls-row select, .controls-row input { padding:8px; border:1px solid #cbd5e1; border-radius:6px; }
+  .controls-row button { padding:8px 16px; border:none; border-radius:6px; background:#0f172a; color:#fff; cursor:pointer; }
+  #replayMap { height:420px; border-radius:10px; margin-top:12px; }
+  table { width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; }
+  th, td { padding:10px 14px; text-align:right; font-size:14px; border-bottom:1px solid #f1f5f9; }
+  th { background:#0f172a; color:#fff; }
+  tr:hover { background:#f8fafc; }
+  .rank-1 { background:#fef9c3; }
+  .rank-2 { background:#f1f5f9; }
+  .rank-3 { background:#fef2e2; }
+  .export-buttons { display:flex; gap:8px; margin-bottom:14px; }
+  .export-buttons button { background:#16a34a; }
+  .export-buttons button.pdf { background:#dc2626; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h2>📊 التقارير والأداء</h2>
+    <div class="topbar-right">
+      <a href="index.html" style="color:#fff;margin-left:16px;">← الخريطة المباشرة</a>
+      <a href="messages.html" style="color:#fff;margin-left:16px;">💬 الرسائل</a>
+      <a href="upload-performance.html" style="color:#fff;margin-left:16px;">📤 رفع تقرير هنقرستيشن</a>
+      <a href="drivers.html" style="color:#fff;margin-left:16px;">👥 إدارة المناديب</a>
+      <button id="logoutBtn">خروج</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab-btn active" data-tab="replay">🎬 إعادة تشغيل المسار</div>
+    <div class="tab-btn" data-tab="leaderboard">🏆 لوحة الأداء والمقارنة</div>
+    <div class="tab-btn" data-tab="orders">📦 تقرير التوصيلات اليومي</div>
+  </div>
+
+  <!-- تبويب إعادة التشغيل -->
+  <div class="tab-panel active" id="tab-replay">
+    <div class="controls-row">
+      <select id="replayDriverSelect"><option>جاري التحميل...</option></select>
+      <input type="date" id="replayDate">
+      <button id="loadRouteBtn">تحميل المسار</button>
+      <button id="playBtn" disabled>▶ تشغيل</button>
+      <button id="pauseBtn" disabled>⏸ إيقاف مؤقت</button>
+      <label style="font-size:13px;">السرعة:
+        <select id="speedSelect">
+          <option value="500">عادية</option>
+          <option value="150">سريعة</option>
+          <option value="30">فائقة السرعة</option>
+        </select>
+      </label>
+      <span id="replayInfo" style="font-size:13px;color:#64748b;"></span>
+    </div>
+    <input type="range" id="replaySlider" min="0" max="0" value="0" style="width:100%;">
+    <div id="replayMap"></div>
+  </div>
+
+  <!-- تبويب لوحة الأداء -->
+  <div class="tab-panel" id="tab-leaderboard">
+    <div class="controls-row">
+      <label>من: <input type="date" id="fromDate"></label>
+      <label>إلى: <input type="date" id="toDate"></label>
+      <button id="loadLeaderboardBtn">تحديث</button>
+    </div>
+    <div class="export-buttons">
+      <button id="exportExcelBtn">⬇️ تصدير Excel</button>
+      <button id="exportPdfBtn" class="pdf">🖨️ تصدير PDF (طباعة)</button>
+    </div>
+    <table id="leaderboardTable">
+      <thead>
+        <tr>
+          <th>الترتيب</th><th>الاسم</th><th>رقم المندوب</th>
+          <th>إجمالي المسافة (كم)</th><th>متوسط يومي (كم)</th>
+          <th>أيام النشاط</th><th>آخر دوام (ساعات)</th>
+        </tr>
+      </thead>
+      <tbody id="leaderboardBody"></tbody>
+    </table>
+  </div>
+
+  <!-- تبويب تقرير التوصيلات اليومي -->
+  <div class="tab-panel" id="tab-orders">
+    <div class="controls-row">
+      <button id="prevDayBtn">◀ اليوم السابق</button>
+      <input type="date" id="ordersDate">
+      <button id="nextDayBtn">اليوم التالي ▶</button>
+      <button id="loadOrdersBtn">تحديث</button>
+      <button id="exportOrdersExcelBtn" style="background:#16a34a;">⬇️ تصدير Excel</button>
+    </div>
+    <div id="ordersSummaryCards" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>المندوب</th><th>رقم المندوب</th><th>الإجمالي</th><th>ناجحة</th><th>فاشلة</th>
+          <th>أبرز سبب فشل</th><th>تفاصيل</th>
+        </tr>
+      </thead>
+      <tbody id="ordersTableBody"></tbody>
+    </table>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/reports.js"></script>
+</body>
+</html>

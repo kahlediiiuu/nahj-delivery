@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>رفع تقرير الأداء اليومي - نهج للتوصيل</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .page-wrap { padding: 20px; }
+  .upload-box { background:#fff; border:2px dashed #cbd5e1; border-radius:12px; padding:30px; text-align:center; margin-bottom:20px; }
+  .upload-box input[type=file] { margin-top:10px; }
+  table { width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; font-size:13px; }
+  th, td { padding:8px 10px; text-align:right; border-bottom:1px solid #f1f5f9; }
+  th { background:#0f172a; color:#fff; position:sticky; top:0; }
+  select, input[type=number], input[type=text] { padding:5px; border:1px solid #cbd5e1; border-radius:6px; width:100%; box-sizing:border-box; }
+  .color-green { background:#dcfce7; }
+  .color-yellow { background:#fef9c3; }
+  .color-red { background:#fee2e2; }
+  .btn { padding:10px 20px; border:none; border-radius:8px; cursor:pointer; color:#fff; background:#0f172a; }
+  .btn-success { background:#16a34a; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h2>📤 رفع تقرير الأداء اليومي (من هنقرستيشن)</h2>
+    <div class="topbar-right">
+      <a href="index.html" style="color:#fff;margin-left:16px;">← الخريطة المباشرة</a>
+      <a href="reports.html" style="color:#fff;margin-left:16px;">📊 التقارير</a>
+      <a href="messages.html" style="color:#fff;margin-left:16px;">💬 الرسائل</a>
+      <button id="logoutBtn">خروج</button>
+    </div>
+  </div>
+
+  <div class="page-wrap">
+    <div class="upload-box">
+      <p>اختر ملف Excel (.xlsx) الذي استلمته من هنقرستيشن</p>
+      <input type="file" id="fileInput" accept=".xlsx,.xls">
+      <p style="font-size:12px;color:#64748b;margin-top:10px;">
+        سيُعرض لك الملف كجدول قابل للتعديل، اربط كل صف بالمندوب الصحيح من القائمة، ثم اضغط "رفع التقرير".
+      </p>
+    </div>
+
+    <div id="previewSection" style="display:none;">
+      <label>تاريخ هذا التقرير: <input type="date" id="reportDate"></label>
+      <div style="overflow-x:auto;margin:16px 0;">
+        <table id="previewTable">
+          <thead>
+            <tr>
+              <th>البيانات من الملف (الاسم كما ورد)</th>
+              <th>اربطه بالمندوب</th>
+              <th>طلبات مقبولة</th>
+              <th>طلبات مرفوضة</th>
+              <th>عدد التحقق</th>
+              <th>الفئة (نص)</th>
+              <th>لون الفئة</th>
+            </tr>
+          </thead>
+          <tbody id="previewBody"></tbody>
+        </table>
+      </div>
+      <button class="btn btn-success" id="submitBtn">✅ رفع التقرير لكل المناديب</button>
+      <p id="uploadMsg" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/upload-performance.js"></script>
+</body>
+</html>

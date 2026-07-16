@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة التحكم - نهج للتوصيل</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="topbar">
+    <h2>🚚 نهج للتوصيل - المتابعة المباشرة</h2>
+    <div class="topbar-right">
+      <a href="change-password.html" style="color:#fff;margin-left:16px;">🔑 تغيير كلمة المرور</a>
+      <a href="messages.html" style="color:#fff;margin-left:16px;">💬 الرسائل</a>
+      <a href="upload-performance.html" style="color:#fff;margin-left:16px;">📤 رفع تقرير هنقرستيشن</a>
+      <a href="drivers.html" style="color:#fff;margin-left:16px;">👥 إدارة المناديب</a>
+      <a href="reports.html" style="color:#fff;margin-left:16px;">📊 التقارير والأداء</a>
+      <span id="adminName"></span>
+      <button id="logoutBtn">خروج</button>
+    </div>
+  </div>
+
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-box"><span class="stat-num" id="statOnline">0</span><span>🟢 متصل</span></div>
+    <div class="stat-box"><span class="stat-num" id="statOffline">0</span><span>🔴 غير متصل</span></div>
+    <div class="stat-box"><span class="stat-num" id="statInside">0</span><span>🔵 داخل النطاق</span></div>
+    <div class="stat-box"><span class="stat-num" id="statOutside">0</span><span>⚠️ خارج النطاق</span></div>
+    <div class="stat-box"><span class="stat-num" id="statMoving">0</span><span>متحرك</span></div>
+    <div class="stat-box"><span class="stat-num" id="statStopped">0</span><span>🟡 متوقف</span></div>
+  </div>
+
+  <div class="main-layout">
+    <div id="map"></div>
+    <div class="sidebar">
+      <input type="text" id="searchDriver" placeholder="بحث باسم المندوب أو رقمه...">
+      <div id="driverList"></div>
+    </div>
+  </div>
+
+  <div id="driverModal" class="modal hidden">
+    <div class="modal-content">
+      <span class="close-btn" id="closeModal">&times;</span>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <div id="alertsToast"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

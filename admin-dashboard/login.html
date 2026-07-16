@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تسجيل الدخول - نهج للتوصيل</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="login-body">
+  <div class="login-card">
+    <h1>نهج للتوصيل</h1>
+    <p class="subtitle">نظام متابعة المناديب المباشر</p>
+    <form id="loginForm">
+      <label>اسم المستخدم</label>
+      <input type="text" id="username" required autocomplete="username">
+      <label>كلمة المرور</label>
+      <input type="password" id="password" required autocomplete="current-password">
+      <button type="submit">دخول</button>
+      <p id="errorMsg" class="error-msg"></p>
+    </form>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script>
+    const API_URL = NAHJ_API_URL;
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const errorMsg = document.getElementById('errorMsg');
+      errorMsg.textContent = '';
+
+      try {
+        const res = await fetch(`${API_URL}/auth/admin/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          localStorage.removeItem('nahj_admin_token'); // احتياط
+          sessionStorage.setItem('nahj_admin_token', data.token);
+          sessionStorage.setItem('nahj_admin_name', data.name || '');
+          window.location.href = 'index.html';
+        } else {
+          errorMsg.textContent = data.message || 'خطأ في تسجيل الدخول';
+        }
+      } catch (err) {
+        errorMsg.textContent = 'تعذّر الاتصال بالخادم';
+      }
+    });
+  </script>
+</body>
+</html>

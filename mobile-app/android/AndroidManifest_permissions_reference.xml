@@ -1,0 +1,24 @@
+<!--
+  هذا ملف مرجعي فقط: انسخ هذه الأسطر إلى android/app/src/main/AndroidManifest.xml
+  الحقيقي الذي ينشئه أمر `flutter create` (ضعها قبل وسم <application>).
+-->
+
+<uses-permission android:name="android.permission.INTERNET"/>
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+<uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+<uses-permission android:name="android.permission.WAKE_LOCK"/>
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+<!--
+  داخل وسم <application>، تأكد من إضافة خدمة flutter_background_service
+  (تُضاف تلقائياً عند تشغيل `flutter pub get` بعد إضافة الحزمة في pubspec.yaml،
+  راجع توثيق الحزمة الرسمي على pub.dev لأي تحديثات على اسم الـ Service).
+
+  ملاحظة مهمة: بعض الأجهزة (Xiaomi, Huawei, Oppo, Samsung) تطبّق تحسين بطارية
+  عدواني يوقف التطبيقات الخلفية رغم كل الأذونات أعلاه. يجب إرشاد المندوب لتفعيل
+  "تشغيل بدون قيود / السماح بالعمل في الخلفية" لهذا التطبيق تحديداً من إعدادات الجهاز.
+-->
