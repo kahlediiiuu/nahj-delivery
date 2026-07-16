@@ -57,14 +57,13 @@
     <table>
       <thead>
         <tr>
-          <th>الرقم التعريفي الدائم</th><th>الاسم</th><th>رقم المندوب (دخول)</th><th>رقم الجوال</th><th>الحالة</th><th>إجراءات</th>
+          <th>الرقم التعريفي الدائم</th><th>الاسم</th><th>رقم المندوب (دخول)</th><th>رقم الجوال</th><th>رمز المطابقة</th><th>الحالة</th><th>إجراءات</th>
         </tr>
       </thead>
       <tbody id="driversTableBody"></tbody>
     </table>
   </div>
 
-  <!-- نافذة إضافة/تعديل مندوب -->
   <div id="driverModal" class="modal hidden">
     <div class="modal-content">
       <h3 id="modalTitle">إضافة مندوب جديد</h3>
@@ -75,6 +74,8 @@
       <input type="text" id="inputPhone">
       <label>رقم المندوب (يستخدمه للدخول)</label>
       <input type="text" id="inputCode">
+      <label>رمز المطابقة (لمطابقة تلقائية عند رفع ملفات الأداء - اختياري)</label>
+      <input type="text" id="inputMatchCode" placeholder="مثال: رقم موظف هنقرستيشن">
       <label id="passwordLabel">كلمة المرور</label>
       <input type="password" id="inputPassword">
       <p id="modalError" style="color:#dc2626;font-size:13px;margin-top:8px;"></p>
