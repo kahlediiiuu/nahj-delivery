@@ -4,7 +4,7 @@ const map = L.map('map').setView([24.7136, 46.6753], 11);
 (async function centerOnRealWorkZone() {
   try {
     const token = sessionStorage.getItem('nahj_admin_token');
-    const res = await fetch(`${window.NAHJ_API_URL}/settings/workzone`, {
+    const res = await fetch(`${NAHJ_API_URL}/settings/workzone`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json();
