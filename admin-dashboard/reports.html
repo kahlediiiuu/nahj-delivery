@@ -44,9 +44,10 @@
     <div class="tab-btn active" data-tab="replay">🎬 إعادة تشغيل المسار</div>
     <div class="tab-btn" data-tab="leaderboard">🏆 لوحة الأداء والمقارنة</div>
     <div class="tab-btn" data-tab="orders">📦 تقرير التوصيلات اليومي</div>
+    <div class="tab-btn" data-tab="leave">🗓️ طلبات الإجازة</div>
+    <div class="tab-btn" data-tab="absences">🚫 سجل الغياب</div>
   </div>
 
-  <!-- تبويب إعادة التشغيل -->
   <div class="tab-panel active" id="tab-replay">
     <div class="controls-row">
       <select id="replayDriverSelect"><option>جاري التحميل...</option></select>
@@ -67,7 +68,6 @@
     <div id="replayMap"></div>
   </div>
 
-  <!-- تبويب لوحة الأداء -->
   <div class="tab-panel" id="tab-leaderboard">
     <div class="controls-row">
       <label>من: <input type="date" id="fromDate"></label>
@@ -90,7 +90,6 @@
     </table>
   </div>
 
-  <!-- تبويب تقرير التوصيلات اليومي -->
   <div class="tab-panel" id="tab-orders">
     <div class="controls-row">
       <button id="prevDayBtn">◀ اليوم السابق</button>
@@ -108,6 +107,43 @@
         </tr>
       </thead>
       <tbody id="ordersTableBody"></tbody>
+    </table>
+  </div>
+
+  <div class="tab-panel" id="tab-leave">
+    <div class="controls-row">
+      <select id="leaveStatusFilter">
+        <option value="">كل الحالات</option>
+        <option value="pending" selected>قيد المراجعة فقط</option>
+        <option value="approved">مقبولة</option>
+        <option value="rejected">مرفوضة</option>
+      </select>
+      <button id="loadLeaveBtn">تحديث</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>المندوب</th><th>السبب</th><th>التاريخ المطلوب</th><th>ملاحظة المندوب</th><th>تاريخ التقديم</th><th>الحالة</th><th>إجراء</th>
+        </tr>
+      </thead>
+      <tbody id="leaveTableBody"></tbody>
+    </table>
+  </div>
+
+  <div class="tab-panel" id="tab-absences">
+    <div class="controls-row">
+      <button id="prevAbsenceDayBtn">◀ اليوم السابق</button>
+      <input type="date" id="absenceDate">
+      <button id="nextAbsenceDayBtn">اليوم التالي ▶</button>
+      <button id="loadAbsencesBtn">تحديث</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>المندوب</th><th>رقم المندوب</th><th>الجوال</th><th>ملاحظة/سبب الغياب</th>
+        </tr>
+      </thead>
+      <tbody id="absencesTableBody"></tbody>
     </table>
   </div>
 
