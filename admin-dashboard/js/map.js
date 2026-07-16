@@ -1,5 +1,19 @@
 // إدارة خريطة OpenStreetMap عبر Leaflet وعلامات المناديب
-const map = L.map('map').setView([24.7136, 46.6753], 11); // الرياض كنقطة بداية افتراضية - غيّرها حسب مدينتك
+const map = L.map('map').setView([24.7136, 46.6753], 11); // قيمة مبدئية مؤقتة، سيتم تحديثها فورًا من نطاق العمل الفعلي أدناه
+
+// عند تحميل الصفحة، اجلب نطاق العمل الحقيقي المحفوظ ووسّط الخريطة عليه تلقائيًا
+(async function centerOnRealWorkZone() {
+  try {
+    const token = sessionStorage.getItem('nahj_admin_token');
+    const res = await fetch(`${window.NAHJ_API_URL}/settings/workzone`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (data.success && data.lat && data.lng) {
+      map.setView([data.lat, data.lng], 12);
+    }
+  } catch (_) {}
+})();
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
@@ -36,13 +50,11 @@ function makeIcon(color) {
 }
 
 function updateMarkers(locations, driversInfo) {
-  const seen = new Set();
   const now = Date.now();
   window.lastLocationsData = locations;
   window.lastDriversInfo = driversInfo;
 
   for (const [driverId, loc] of Object.entries(locations)) {
-    seen.add(driverId);
     const { color, label } = statusColor(loc);
     const info = driversInfo[driverId] || {};
     const sinceUpdate = now - (loc.timestamp || now);
@@ -53,7 +65,9 @@ function updateMarkers(locations, driversInfo) {
       <span style="color:${color}">${label}</span><br>
       السرعة: ${(loc.speed || 0).toFixed(1)} كم/س<br>
       البطارية: ${loc.battery ?? '--'}%<br>
-      ${isOffline ? `<span style="color:#dc2626">آخر تحديث: ${formatDuration(sinceUpdate)}</span>` : 'آخر تحديث: الآن'}
+      ${isOffline ? `<span style="color:#dc2626">آخر تحديث: ${formatDuration(sinceUpdate)}</span>` : 'آخر تحديث: الآن'}<br>
+      <a href="#" onclick="window.openDriverDetails && window.openDriverDetails('${driverId}'); return false;" style="color:#2563eb;">عرض التفاصيل الكاملة</a> |
+      <a href="reports.html?driverId=${driverId}&tab=replay" style="color:#16a34a;">متابعة مسار الحركة</a>
     `;
 
     if (markers[driverId]) {
@@ -80,14 +94,14 @@ setInterval(() => {
   if (window.lastLocationsData) {
     updateMarkers(window.lastLocationsData, window.lastDriversInfo || {});
   }
-}, 20000);
+}, 15000);
 
 const locateControl = L.control({ position: 'topleft' });
 locateControl.onAdd = function () {
   const btn = L.DomUtil.create('button', 'locate-me-btn');
   btn.innerHTML = '📍';
   btn.title = 'تحديد موقعي الحالي';
-  btn.style.cssText = 'width:40px;height:40px;background:#fff;border:2px solid rgba(0,0,0,.2);border-radius:6px;font-size:20px;cursor:pointer;';
+  btn.style.cssText = 'width:40px;height:40px;background:#fff;border:2px solid rgba(0,0,0,.2);border-radius:6px;font-size:20px;cursor:pointer;margin-bottom:6px;';
   L.DomEvent.disableClickPropagation(btn);
   btn.onclick = () => {
     if (!navigator.geolocation) {
@@ -95,12 +109,29 @@ locateControl.onAdd = function () {
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        map.setView([pos.coords.latitude, pos.coords.longitude], 15);
-      },
+      (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], 15),
       () => alert('تعذّر تحديد موقعك، تأكد من السماح بالوصول للموقع في المتصفح')
     );
   };
   return btn;
 };
 locateControl.addTo(map);
+
+const refreshControl = L.control({ position: 'topleft' });
+refreshControl.onAdd = function () {
+  const btn = L.DomUtil.create('button', 'refresh-now-btn');
+  btn.innerHTML = '🔄';
+  btn.title = 'تحديث الآن';
+  btn.style.cssText = 'width:40px;height:40px;background:#fff;border:2px solid rgba(0,0,0,.2);border-radius:6px;font-size:20px;cursor:pointer;';
+  L.DomEvent.disableClickPropagation(btn);
+  btn.onclick = () => {
+    if (window.nahjSocket) {
+      window.nahjSocket.emit('request:locations');
+    }
+    btn.style.transform = 'rotate(360deg)';
+    btn.style.transition = 'transform .5s';
+    setTimeout(() => { btn.style.transform = ''; btn.style.transition = ''; }, 500);
+  };
+  return btn;
+};
+refreshControl.addTo(map);
