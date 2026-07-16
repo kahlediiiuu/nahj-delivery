@@ -203,6 +203,17 @@ router.get('/my-stats', verifyToken, async (req, res) => {
       else rating = 'نشاط منخفض اليوم';
     }
 
+   let consecutiveDays = 0;
+    for (let i = 0; i < 60; i++) {
+      const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+      const dayDoc = await db.collection('dailyStats').doc(`${driverId}_${d}`).get();
+      if (dayDoc.exists && (dayDoc.data().totalDistanceMeters || 0) > 0) {
+        consecutiveDays++;
+      } else {
+        break;
+      }
+    }
+
     res.json({
       success: true,
       date,
@@ -210,6 +221,7 @@ router.get('/my-stats', verifyToken, async (req, res) => {
       distanceKm: +distanceKm.toFixed(2),
       onShift: !!driver.onShift,
       rating,
+      consecutiveDays,
     });
   } catch (err) {
     console.error(err);
