@@ -3,8 +3,23 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { db } = require('../config/firebase');
+const { verifyToken } = require('../middleware/auth');
 
-// تسجيل دخول المشرف
+router.post('/driver/fcm-token', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'driver') {
+      return res.status(403).json({ success: false, message: 'مسموح للمناديب فقط' });
+    }
+    const { fcmToken } = req.body;
+    if (!fcmToken) return res.status(400).json({ success: false, message: 'الرمز مطلوب' });
+    await db.collection('drivers').doc(req.user.driverId).set({ fcmToken }, { merge: true });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
 router.post('/admin/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -32,7 +47,6 @@ router.post('/admin/login', async (req, res) => {
   }
 });
 
-// تسجيل دخول المندوب (باستخدام رقم المندوب وكلمة المرور)
 router.post('/driver/login', async (req, res) => {
   try {
     const { driverCode, password } = req.body;
@@ -74,7 +88,6 @@ router.post('/driver/login', async (req, res) => {
   }
 });
 
-// تغيير كلمة مرور المشرف (يتطلب معرفة كلمة المرور الحالية أولاً)
 router.post('/admin/change-password', async (req, res) => {
   try {
     const jwt = require('jsonwebtoken');
@@ -121,7 +134,6 @@ router.post('/admin/change-password', async (req, res) => {
   }
 });
 
-// تغيير اسم المستخدم للمشرف
 router.post('/admin/change-username', async (req, res) => {
   try {
     const jwt = require('jsonwebtoken');
@@ -167,7 +179,6 @@ router.post('/admin/change-username', async (req, res) => {
   }
 });
 
-// إنشاء حساب مشرف إضافي (يتطلب تسجيل دخول كمشرف حالي)
 router.post('/admin/create', async (req, res) => {
   try {
     const jwt = require('jsonwebtoken');
