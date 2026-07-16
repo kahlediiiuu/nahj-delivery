@@ -27,6 +27,24 @@ jobs:
         working-directory: mobile-app
         run: flutter create . --platforms=android --org com.nahj.delivery --project-name nahj_delivery_app
 
+      - name: تفعيل Firebase للإشعارات الحقيقية
+        working-directory: mobile-app
+        run: |
+          cp google-services.json android/app/google-services.json
+          echo "===== نسخ ملف google-services.json بنجاح ====="
+
+          if [ -f android/settings.gradle.kts ]; then
+            sed -i '/org.jetbrains.kotlin.android/a\    id("com.google.gms.google-services") version "4.4.2" apply false' android/settings.gradle.kts
+            echo "===== محتوى settings.gradle.kts بعد الإضافة ====="
+            cat android/settings.gradle.kts
+          fi
+
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i '/id("com.android.application")/a\    id("com.google.gms.google-services")' android/app/build.gradle.kts
+            echo "===== محتوى app/build.gradle.kts بعد الإضافة ====="
+            cat android/app/build.gradle.kts
+          fi
+
       - name: إضافة أذونات الموقع والخلفية المطلوبة
         working-directory: mobile-app
         run: |
