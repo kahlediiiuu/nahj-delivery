@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "25445274589",
+    "firebase_url": "https://nahj-delivery-7c20c-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "nahj-delivery-7c20c",
+    "storage_bucket": "nahj-delivery-7c20c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:25445274589:android:ac716543ed86db573e9c34",
+        "android_client_info": {
+          "package_name": "com.nahj.delivery.nahj_delivery_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAuEEikkUG3kHLerS0E4B9QauX9E8UYKHE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
