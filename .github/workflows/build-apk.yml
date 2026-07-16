@@ -1,0 +1,84 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: تنزيل الكود
+        uses: actions/checkout@v4
+
+      - name: تثبيت Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: تثبيت Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: توليد ملفات أندرويد الأساسية
+        working-directory: mobile-app
+        run: flutter create . --platforms=android --org com.nahj.delivery --project-name nahj_delivery_app
+
+      - name: إضافة أذونات الموقع والخلفية المطلوبة
+        working-directory: mobile-app
+        run: |
+          sed -i '/<application/i\    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>\n    <uses-permission android:name="android.permission.WAKE_LOCK"/>\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>' android/app/src/main/AndroidManifest.xml
+          echo "===== محتوى AndroidManifest.xml بعد الإضافة (للتأكد) ====="
+          cat android/app/src/main/AndroidManifest.xml
+
+      - name: تثبيت نسخة أندرويد المستهدفة على قيمة آمنة (لتفادي انهيار خدمة الموقع الخلفية في أندرويد 14+)
+        working-directory: mobile-app
+        run: |
+          if [ -f android/app/build.gradle.kts ]; then
+            echo "صيغة Kotlin DSL"
+            sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 33/' android/app/build.gradle.kts
+          else
+            echo "صيغة Groovy"
+            sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 33/' android/app/build.gradle
+          fi
+          echo "===== التحقق من القيمة الجديدة ====="
+          grep -i "targetsdk" android/app/build.gradle.kts 2>/dev/null || grep -i "targetsdk" android/app/build.gradle
+
+      - name: تفعيل Core Library Desugaring المطلوب لمكتبة الإشعارات
+        working-directory: mobile-app
+        run: |
+          if [ -f android/app/build.gradle.kts ]; then
+            echo "تم اكتشاف صيغة Kotlin DSL الحديثة"
+            sed -i '/compileOptions {/a\        isCoreLibraryDesugaringEnabled = true' android/app/build.gradle.kts
+            printf '\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")\n}\n' >> android/app/build.gradle.kts
+          else
+            echo "تم اكتشاف صيغة Groovy القديمة"
+            sed -i '/compileOptions {/a\        coreLibraryDesugaringEnabled true' android/app/build.gradle
+            printf '\ndependencies {\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"\n}\n' >> android/app/build.gradle
+          fi
+          echo "===== محتوى ملف Gradle بعد التعديل ====="
+          cat android/app/build.gradle.kts 2>/dev/null || cat android/app/build.gradle
+
+      - name: تثبيت الحزم البرمجية
+        working-directory: mobile-app
+        run: flutter pub get
+
+      - name: 🔍 تشخيص - عرض محتوى الملف الفعلي قبل البناء
+        working-directory: mobile-app
+        run: |
+          echo "===== محتوى location_service.dart كما يراه GitHub الآن ====="
+          cat lib/services/location_service.dart
+          echo "===== نهاية المحتوى ====="
+
+      - name: بناء ملف APK
+        working-directory: mobile-app
+        run: flutter build apk --release
+
+      - name: رفع ملف APK الناتج
+        uses: actions/upload-artifact@v4
+        with:
+          name: nahj-delivery-app
+          path: mobile-app/build/app/outputs/flutter-apk/app-release.apk
