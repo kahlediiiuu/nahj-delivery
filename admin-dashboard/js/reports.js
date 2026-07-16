@@ -182,3 +182,114 @@ document.getElementById('exportExcelBtn').addEventListener('click', () => {
 document.getElementById('exportPdfBtn').addEventListener('click', () => {
   window.print();
 });
+
+let driversMap = {};
+function buildDriversMap() {
+  driversMap = {};
+  driversList.forEach((d) => (driversMap[d.id] = d));
+}
+
+async function loadLeaveRequests() {
+  const status = document.getElementById('leaveStatusFilter').value;
+  const params = status ? `?status=${status}` : '';
+  const res = await fetch(`${API_URL}/leave${params}`, { headers: { Authorization: `Bearer ${token}` } });
+  const data = await res.json();
+  if (!data.success) return;
+
+  buildDriversMap();
+  const tbody = document.getElementById('leaveTableBody');
+  const reasonLabels = { sick: '🤒 مرض', emergency: '🚨 ظرف طارئ/حادث', personal: '👤 ظرف شخصي', other: '📝 أخرى' };
+  const statusLabels = {
+    pending: '<span style="color:#eab308;font-weight:bold;">⏳ قيد المراجعة</span>',
+    approved: '<span style="color:#16a34a;font-weight:bold;">✅ مقبولة</span>',
+    rejected: '<span style="color:#dc2626;font-weight:bold;">❌ مرفوضة</span>',
+  };
+
+  tbody.innerHTML = data.requests
+    .map((r) => {
+      const d = driversMap[r.driverId] || {};
+      const submitted = new Date(r.createdAt).toLocaleString('ar-SA', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const actions = r.status === 'pending'
+        ? `<button onclick="decideLeave('${r.id}', 'approved')" style="background:#16a34a;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;">قبول</button>
+           <button onclick="decideLeave('${r.id}', 'rejected')" style="background:#dc2626;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;margin-right:4px;">رفض</button>`
+        : '—';
+      return `<tr>
+        <td>${d.name || r.driverId} <small style="color:#94a3b8;">#${d.driverCode || ''}</small></td>
+        <td>${reasonLabels[r.reasonType] || r.reasonType}</td>
+        <td>${r.date}</td>
+        <td>${r.note || '--'}</td>
+        <td>${submitted}</td>
+        <td>${statusLabels[r.status] || r.status}</td>
+        <td>${actions}</td>
+      </tr>`;
+    })
+    .join('');
+}
+
+window.decideLeave = async function (id, status) {
+  await fetch(`${API_URL}/leave/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ status }),
+  });
+  loadLeaveRequests();
+};
+
+document.getElementById('loadLeaveBtn').addEventListener('click', loadLeaveRequests);
+document.getElementById('leaveStatusFilter').addEventListener('change', loadLeaveRequests);
+
+document.getElementById('absenceDate').valueAsDate = new Date();
+
+async function loadAbsences() {
+  const date = document.getElementById('absenceDate').value;
+  const res = await fetch(`${API_URL}/performance/absences?date=${date}`, { headers: { Authorization: `Bearer ${token}` } });
+  const data = await res.json();
+  if (!data.success) return;
+
+  buildDriversMap();
+  const tbody = document.getElementById('absencesTableBody');
+  tbody.innerHTML = data.absences
+    .map((a) => {
+      const d = driversMap[a.driverId] || {};
+      return `<tr>
+        <td>${d.name || a.driverId}</td>
+        <td>${d.driverCode || ''}</td>
+        <td>${d.phone || ''}</td>
+        <td>
+          <input type="text" value="${a.note || ''}" placeholder="اكتب سبب الغياب..." style="width:70%;padding:4px;border:1px solid #cbd5e1;border-radius:6px;" onchange="saveAbsenceNote('${a.id}', this.value)">
+        </td>
+      </tr>`;
+    })
+    .join('') || '<tr><td colspan="4" style="text-align:center;color:#16a34a;">لا يوجد غياب في هذا اليوم 🎉</td></tr>';
+}
+
+window.saveAbsenceNote = async function (id, note) {
+  await fetch(`${API_URL}/performance/absences/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ note }),
+  });
+};
+
+document.getElementById('loadAbsencesBtn').addEventListener('click', loadAbsences);
+document.getElementById('prevAbsenceDayBtn').addEventListener('click', () => {
+  const input = document.getElementById('absenceDate');
+  const d = new Date(input.value);
+  d.setDate(d.getDate() - 1);
+  input.valueAsDate = d;
+  loadAbsences();
+});
+document.getElementById('nextAbsenceDayBtn').addEventListener('click', () => {
+  const input = document.getElementById('absenceDate');
+  const d = new Date(input.value);
+  d.setDate(d.getDate() + 1);
+  input.valueAsDate = d;
+  loadAbsences();
+});
+
+document.querySelectorAll('.tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.tab === 'leave') loadLeaveRequests();
+    if (btn.dataset.tab === 'absences') loadAbsences();
+  });
+});
