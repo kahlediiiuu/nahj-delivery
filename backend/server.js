@@ -12,6 +12,7 @@ const settingsRoutes = require('./routes/settings');
 const ordersRoutes = require('./routes/orders');
 const performanceRoutes = require('./routes/performance');
 const messagesRoutes = require('./routes/messages');
+const leaveRoutes = require('./routes/leave');
 const { initLiveTracking } = require('./sockets/liveTracking');
 
 const app = express();
@@ -31,8 +32,8 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/performance', performanceRoutes);
 app.use('/api/messages', messagesRoutes);
+app.use('/api/leave', leaveRoutes);
 
-// بث المواقع اللحظية إلى لوحة التحكم عبر WebSocket
 initLiveTracking(io);
 
 const PORT = process.env.PORT || 3000;
