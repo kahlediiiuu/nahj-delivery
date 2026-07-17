@@ -68,7 +68,7 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
         verificationSuccessRate: toPercent(findVal(['verification_success_rate'])),
         onTimeDeliveryScore: toPercent(findVal(['on_time_delivery_score'])),
         finalQualityScore: Number(findVal(['final_delivery_quality_score', 'quality_score'])) || 0,
-        grade: ['A', 'B', 'C', 'F'].includes(segment) ? segment : '',
+        grade: ['A', 'B', 'C', 'D', 'E', 'F'].includes(segment) ? segment : '',
       };
     });
 
@@ -83,7 +83,9 @@ const gradeOptions = [
   { value: 'A', label: '👑 A - نخبة متميزة' },
   { value: 'B', label: '🥈 B - أداء جيد جدًا' },
   { value: 'C', label: '🥉 C - أداء متوسط' },
-  { value: 'F', label: '⚠️ F - قائمة المتابعة' },
+  { value: 'D', label: '🔸 D - أداء دون المتوسط' },
+  { value: 'E', label: '🔻 E - ضعيف، يحتاج متابعة' },
+  { value: 'F', label: '⚠️ F - قائمة الخطر' },
 ];
 
 function renderPreview() {
