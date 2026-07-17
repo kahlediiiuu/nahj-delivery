@@ -7,7 +7,9 @@ const gradeInfo = {
   A: { emoji: '👑', label: 'نخبة متميزة (A)', color: 'green' },
   B: { emoji: '🥈', label: 'أداء جيد جدًا (B)', color: 'green' },
   C: { emoji: '🥉', label: 'أداء متوسط (C)', color: 'yellow' },
-  F: { emoji: '⚠️', label: 'يحتاج تحسينًا - قائمة المتابعة (F)', color: 'red' },
+  D: { emoji: '🔸', label: 'أداء دون المتوسط (D)', color: 'yellow' },
+  E: { emoji: '🔻', label: 'ضعيف - يحتاج متابعة (E)', color: 'red' },
+  F: { emoji: '⚠️', label: 'قائمة الخطر (F)', color: 'red' },
 };
 
 router.post('/upload', verifyToken, requireAdmin, async (req, res) => {
