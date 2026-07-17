@@ -38,13 +38,36 @@ router.post('/', async (req, res) => {
     });
 
     if (sender === 'admin') {
-      await sendPushToDriver(
-        driverId,
-        requiresResponse ? '⚠️ تنبيه يتطلب ردك الفوري' : '📩 رسالة جديدة من الإدارة',
-        text.trim(),
-        { messageId: docRef.id, requiresResponse: !!requiresResponse },
-        !requiresResponse && req.body.silent === true
-      );
+      if (requiresResponse) {
+        await sendPushToDriver(
+          driverId,
+          '⚠️ تنبيه يتطلب ردك الفوري',
+          text.trim(),
+          { messageId: docRef.id, requiresResponse: true },
+          false,
+          null
+        );
+      } else {
+        const unreadSnap = await db
+          .collection('messages')
+          .where('driverId', '==', driverId)
+          .where('sender', '==', 'admin')
+          .where('readByDriver', '==', false)
+          .get();
+        const unreadCount = unreadSnap.size;
+
+        const bundledTitle = unreadCount > 1 ? `📩 لديك ${unreadCount} رسائل جديدة` : '📩 رسالة جديدة من الإدارة';
+        const bundledBody = unreadCount > 1 ? 'اضغط لعرض كل الرسائل' : text.trim();
+
+        await sendPushToDriver(
+          driverId,
+          bundledTitle,
+          bundledBody,
+          { messageId: docRef.id, bundleCount: unreadCount },
+          req.body.silent === true,
+          'nahj_messages'
+        );
+      }
     }
 
     res.json({ success: true, id: docRef.id, createdAt: now });
@@ -236,6 +259,39 @@ router.post('/broadcast', requireAdmin, async (req, res) => {
 router.delete('/driver/:driverId/all', requireAdmin, async (req, res) => {
   try {
     const snap = await db.collection('messages').where('driverId', '==', req.params.driverId).get();
+    await Promise.all(snap.docs.map((d) => d.ref.delete()));
+    res.json({ success: true, deletedCount: snap.size });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+router.post('/my/mark-all-read', async (req, res) => {
+  try {
+    if (req.user.role !== 'driver') {
+      return res.status(403).json({ success: false, message: 'مسموح للمناديب فقط' });
+    }
+    const snap = await db
+      .collection('messages')
+      .where('driverId', '==', req.user.driverId)
+      .where('sender', '==', 'admin')
+      .where('readByDriver', '==', false)
+      .get();
+    await Promise.all(snap.docs.map((d) => d.ref.update({ readByDriver: true })));
+    res.json({ success: true, updatedCount: snap.size });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+router.delete('/my/all', async (req, res) => {
+  try {
+    if (req.user.role !== 'driver') {
+      return res.status(403).json({ success: false, message: 'مسموح للمناديب فقط' });
+    }
+    const snap = await db.collection('messages').where('driverId', '==', req.user.driverId).get();
     await Promise.all(snap.docs.map((d) => d.ref.delete()));
     res.json({ success: true, deletedCount: snap.size });
   } catch (err) {
