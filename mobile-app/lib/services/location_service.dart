@@ -7,17 +7,40 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 
-const List<String> _motivationalMessages = [
-  '☀️ صباح الخير يا بطل',
-  '🚗 نتمنى لك يوماً موفقاً',
-  '🙏 شكراً لالتزامك',
-  '⭐ جهودك محل تقدير',
-  '🏆 حافظ على تقييمك المرتفع',
-  '🎁 كل طلب تنجزه يقربك من مكافآتك',
-  '📈 استمرارك في الالتزام يزيد فرص حصولك على المكافآت',
-  '🛣️ نتمنى لك قيادة آمنة',
-  '💙 أنت جزء مهم من فريق نهج للتوصيل',
-];
+const Map<String, Map<String, List<String>>> _timedMessages = {
+  'morning': {
+    'ar': ['☀️ صباح الخير يا بطل', '🌅 نتمنى لك صباحًا مثمرًا', '☕ صباح النشاط والحيوية'],
+    'en': ['☀️ Good morning, champion', '🌅 Wishing you a productive morning'],
+    'bn': ['☀️ শুভ সকাল, চ্যাম্পিয়ন', '🌅 আপনার জন্য একটি ফলপ্রসূ সকাল কামনা করি'],
+  },
+  'afternoon': {
+    'ar': ['🚗 نتمنى لك يوماً موفقاً', '💪 استمر بنفس النشاط', '🎁 كل طلب تنجزه يقربك من مكافآتك'],
+    'en': ['🚗 Wishing you a great day', '💪 Keep up the great work'],
+    'bn': ['🚗 আপনার জন্য একটি চমৎকার দিন কামনা করি', '💪 একই উদ্যমে কাজ চালিয়ে যান'],
+  },
+  'evening': {
+    'ar': ['🌆 مساء الخير، شكراً لجهودك اليوم', '⭐ جهودك محل تقدير', '🏆 حافظ على تقييمك المرتفع'],
+    'en': ['🌆 Good evening, thanks for your effort today', '⭐ Your effort is appreciated'],
+    'bn': ['🌆 শুভ সন্ধ্যা, আজকের প্রচেষ্টার জন্য ধন্যবাদ', '⭐ আপনার প্রচেষ্টা প্রশংসিত'],
+  },
+  'night': {
+    'ar': ['🌙 نتمنى لك قيادة آمنة', '💙 أنت جزء مهم من فريق نهج للتوصيل'],
+    'en': ['🌙 Drive safely', '💙 You are a valued part of our team'],
+    'bn': ['🌙 নিরাপদে গাড়ি চালান', '💙 আপনি আমাদের দলের একটি মূল্যবান অংশ'],
+  },
+};
+
+String _lastMotivationalMessage = '';
+
+String _pickMotivationalMessage(String lang) {
+  final hour = DateTime.now().hour;
+  final period = hour < 12 ? 'morning' : (hour < 17 ? 'afternoon' : (hour < 20 ? 'evening' : 'night'));
+  final pool = _timedMessages[period]?[lang] ?? _timedMessages[period]?['ar'] ?? ['نهج للتوصيل'];
+  final candidates = pool.where((m) => m != _lastMotivationalMessage).toList();
+  final chosen = (candidates.isEmpty ? pool : candidates)[DateTime.now().millisecond % (candidates.isEmpty ? pool.length : candidates.length)];
+  _lastMotivationalMessage = chosen;
+  return chosen;
+}
 
 class LocationService {
   static Future<void> initialize() async {
@@ -130,8 +153,9 @@ Future<void> _runServiceLoop(ServiceInstance service) async {
         } else if (pendingCount > 0) {
           content = 'جاري مزامنة سجل حضورك...';
         } else {
-          content = _motivationalMessages[
-              (DateTime.now().minute ~/ 5) % _motivationalMessages.length];
+          final prefs = await SharedPreferences.getInstance();
+          final lang = prefs.getString('app_language') ?? 'ar';
+          content = _pickMotivationalMessage(lang);
         }
         service.setForegroundNotificationInfo(
           title: 'نهج للتوصيل - في العمل',
