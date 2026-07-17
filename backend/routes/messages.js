@@ -226,5 +226,14 @@ router.post('/broadcast', requireAdmin, async (req, res) => {
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
   }
 });
-
+router.delete('/driver/:driverId/all', requireAdmin, async (req, res) => {
+  try {
+    const snap = await db.collection('messages').where('driverId', '==', req.params.driverId).get();
+    await Promise.all(snap.docs.map((d) => d.ref.delete()));
+    res.json({ success: true, deletedCount: snap.size });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
 module.exports = router;
