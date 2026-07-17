@@ -150,7 +150,32 @@ class _MessagesScreenState extends State<MessagesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(AppStrings.get('messages'))),
+      appBar: AppBar(
+        title: Text(AppStrings.get('messages')),
+        actions: [
+          if (_messages.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete_sweep_outlined),
+              tooltip: 'حذف كل الرسائل',
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    content: const Text('حذف كل الرسائل نهائيًا؟'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('حذف الكل', style: TextStyle(color: Colors.red))),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  await ApiService.deleteAllMyMessages();
+                  _load();
+                }
+              },
+            ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
