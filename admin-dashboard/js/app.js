@@ -395,8 +395,35 @@ document.getElementById('sendBroadcastBtn').addEventListener('click', async () =
 });
 
 window.activeCityFilter = null;
+
+const cityCoordinates = {
+  'الرياض': [24.7136, 46.6753],
+  'جدة': [21.4858, 39.1925],
+  'الدمام': [26.4207, 50.0888],
+  'مكة': [21.3891, 39.8579],
+  'المدينة': [24.5247, 39.5692],
+  'ينبع': [24.0895, 38.0618],
+};
+
 document.getElementById('cityFilterSelect').addEventListener('change', (e) => {
   window.activeCityFilter = e.target.value || null;
+
+  if (window.activeCityFilter && cityCoordinates[window.activeCityFilter]) {
+    map.setView(cityCoordinates[window.activeCityFilter], 12);
+  }
+
   if (window.lastLocationsData) updateMarkers(window.lastLocationsData, window.lastDriversInfo || {});
   renderDriverList(document.getElementById('searchDriver').value);
+
+  if (!window.activeCityFilter) {
+    setTimeout(() => {
+      const visibleMarkers = Object.values(markers);
+      if (visibleMarkers.length === 1) {
+        map.setView(visibleMarkers[0].getLatLng(), 13);
+      } else if (visibleMarkers.length > 1) {
+        const bounds = L.latLngBounds(visibleMarkers.map((m) => m.getLatLng()));
+        map.fitBounds(bounds, { padding: [50, 50] });
+      }
+    }, 150);
+  }
 });
