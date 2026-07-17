@@ -167,8 +167,14 @@ router.get('/my/unread-count', async (req, res) => {
   }
 });
 
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
+    if (req.user.role !== 'admin') {
+      const doc = await db.collection('messages').doc(req.params.id).get();
+      if (!doc.exists || doc.data().driverId !== req.user.driverId) {
+        return res.status(403).json({ success: false, message: 'غير مسموح' });
+      }
+    }
     await db.collection('messages').doc(req.params.id).delete();
     res.json({ success: true });
   } catch (err) {
@@ -226,6 +232,7 @@ router.post('/broadcast', requireAdmin, async (req, res) => {
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
   }
 });
+
 router.delete('/driver/:driverId/all', requireAdmin, async (req, res) => {
   try {
     const snap = await db.collection('messages').where('driverId', '==', req.params.driverId).get();
@@ -236,4 +243,5 @@ router.delete('/driver/:driverId/all', requireAdmin, async (req, res) => {
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
   }
 });
+
 module.exports = router;
