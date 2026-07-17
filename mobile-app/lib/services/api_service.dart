@@ -266,6 +266,40 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  static Future<Map<String, dynamic>> getReportComments(String date) async {
+    final token = await getToken();
+    final driverId = await _getDriverIdFromToken();
+    final res = await http.get(
+      Uri.parse('$baseUrl/performance/$driverId/$date/comments'),
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 30));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> addReportComment(String date, String text) async {
+    final token = await getToken();
+    final driverId = await _getDriverIdFromToken();
+    final res = await http.post(
+      Uri.parse('$baseUrl/performance/$driverId/$date/comments'),
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      body: jsonEncode({'text': text}),
+    ).timeout(const Duration(seconds: 30));
+    return jsonDecode(res.body);
+  }
+
+  static Future<String?> _getDriverIdFromToken() async {
+    final token = await getToken();
+    if (token == null) return null;
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+      final payload = jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
+      return payload['driverId'];
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<Map<String, dynamic>> getMyReport({String? date}) async {
     final token = await getToken();
     final uri = date != null
