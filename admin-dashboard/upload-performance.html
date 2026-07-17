@@ -13,9 +13,6 @@
   th, td { padding:8px 10px; text-align:right; border-bottom:1px solid #f1f5f9; }
   th { background:#0f172a; color:#fff; position:sticky; top:0; }
   select, input[type=number], input[type=text] { padding:5px; border:1px solid #cbd5e1; border-radius:6px; width:100%; box-sizing:border-box; }
-  .color-green { background:#dcfce7; }
-  .color-yellow { background:#fef9c3; }
-  .color-red { background:#fee2e2; }
   .btn { padding:10px 20px; border:none; border-radius:8px; cursor:pointer; color:#fff; background:#0f172a; }
   .btn-success { background:#16a34a; }
 </style>
@@ -33,26 +30,26 @@
 
   <div class="page-wrap">
     <div class="upload-box">
-      <p>اختر ملف Excel (.xlsx) الذي استلمته من هنقرستيشن</p>
+      <p>اختر ملف Excel (.xlsx) الذي استلمته يوميًا</p>
       <input type="file" id="fileInput" accept=".xlsx,.xls">
       <p style="font-size:12px;color:#64748b;margin-top:10px;">
-        سيُعرض لك الملف كجدول قابل للتعديل، اربط كل صف بالمندوب الصحيح من القائمة، ثم اضغط "رفع التقرير".
+        المطابقة تتم تلقائيًا عبر عمود rider_id. تأكد أن "رمز المطابقة" لكل مندوب (في صفحة إدارة المناديب) مطابق لنفس القيمة الموجودة في هذا العمود.
       </p>
     </div>
 
     <div id="previewSection" style="display:none;">
       <label>تاريخ هذا التقرير: <input type="date" id="reportDate"></label>
+      <p id="matchSummary" style="margin:10px 0;font-weight:bold;color:#0f172a;"></p>
       <div style="overflow-x:auto;margin:16px 0;">
         <table id="previewTable">
           <thead>
             <tr>
-              <th>البيانات من الملف (الاسم كما ورد)</th>
+              <th>رقم المندوب (rider_id)</th>
               <th>اربطه بالمندوب</th>
-              <th>طلبات مقبولة</th>
-              <th>طلبات مرفوضة</th>
-              <th>عدد التحقق</th>
-              <th>الفئة (نص)</th>
-              <th>لون الفئة</th>
+              <th>المدينة</th>
+              <th>منجزة/إجمالي</th>
+              <th>الالتزام بالوقت</th>
+              <th>الفئة</th>
             </tr>
           </thead>
           <tbody id="previewBody"></tbody>
