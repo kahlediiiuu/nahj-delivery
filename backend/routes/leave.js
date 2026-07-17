@@ -39,9 +39,11 @@ router.get('/my', async (req, res) => {
     const snap = await db
       .collection('leaveRequests')
       .where('driverId', '==', req.user.driverId)
-      .orderBy('createdAt', 'desc')
       .get();
-    res.json({ success: true, requests: snap.docs.map((d) => ({ id: d.id, ...d.data() })) });
+    const requests = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => b.createdAt - a.createdAt);
+    res.json({ success: true, requests });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
@@ -50,10 +52,11 @@ router.get('/my', async (req, res) => {
 
 router.get('/', requireAdmin, async (req, res) => {
   try {
-    let query = db.collection('leaveRequests');
-    if (req.query.status) query = query.where('status', '==', req.query.status);
-    const snap = await query.orderBy('createdAt', 'desc').get();
-    res.json({ success: true, requests: snap.docs.map((d) => ({ id: d.id, ...d.data() })) });
+    const snap = await db.collection('leaveRequests').get();
+    let requests = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    if (req.query.status) requests = requests.filter((r) => r.status === req.query.status);
+    requests.sort((a, b) => b.createdAt - a.createdAt);
+    res.json({ success: true, requests });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
