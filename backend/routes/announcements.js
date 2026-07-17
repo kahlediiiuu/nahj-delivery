@@ -99,9 +99,11 @@ router.get('/:id/notes', requireAdmin, async (req, res) => {
     const snap = await db
       .collection('announcementNotes')
       .where('announcementId', '==', req.params.id)
-      .orderBy('createdAt', 'desc')
       .get();
-    res.json({ success: true, notes: snap.docs.map((d) => ({ id: d.id, ...d.data() })) });
+    const notes = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => b.createdAt - a.createdAt);
+    res.json({ success: true, notes });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
