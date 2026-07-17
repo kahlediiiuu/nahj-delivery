@@ -165,6 +165,72 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  static Future<Map<String, dynamic>> addWorkHourRange(String date, String start, String end) async {
+    final token = await getToken();
+    final res = await http.post(
+      Uri.parse('$baseUrl/workhours'),
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      body: jsonEncode({'date': date, 'start': start, 'end': end}),
+    ).timeout(const Duration(seconds: 30));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> deleteWorkHourRange(String date, int index) async {
+    final token = await getToken();
+    final res = await http.delete(
+      Uri.parse('$baseUrl/workhours/$date/$index'),
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 30));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getWorkHours(String date) async {
+    final token = await getToken();
+    final res = await http.get(
+      Uri.parse('$baseUrl/workhours/my?date=$date'),
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 30));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getWorkHoursHistory() async {
+    final token = await getToken();
+    final res = await http.get(
+      Uri.parse('$baseUrl/workhours/my/history'),
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 30));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> submitDailyNote({
+    required String type,
+    String? note,
+    String? attachmentData,
+    String? attachmentType,
+  }) async {
+    final token = await getToken();
+    final res = await http.post(
+      Uri.parse('$baseUrl/dailynotes'),
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      body: jsonEncode({
+        'type': type,
+        'note': note,
+        'attachmentData': attachmentData,
+        'attachmentType': attachmentType,
+      }),
+    ).timeout(const Duration(seconds: 60));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getMyDailyNotes() async {
+    final token = await getToken();
+    final res = await http.get(
+      Uri.parse('$baseUrl/dailynotes/my'),
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 30));
+    return jsonDecode(res.body);
+  }
+
   static Future<Map<String, dynamic>> getMyReport({String? date}) async {
     final token = await getToken();
     final uri = date != null
