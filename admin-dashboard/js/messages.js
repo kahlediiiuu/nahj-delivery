@@ -73,6 +73,14 @@ function renderMessages(messages) {
         year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
       });
       const isAdmin = m.sender === 'admin';
+      let attachmentBlock = '';
+      if (m.attachmentUrl) {
+        if ((m.attachmentType || '').startsWith('image/')) {
+          attachmentBlock = `<img src="${m.attachmentUrl}" style="max-width:220px;border-radius:10px;margin-top:6px;display:block;" onclick="window.open('${m.attachmentUrl}','_blank')">`;
+        } else {
+          attachmentBlock = `<a href="${m.attachmentUrl}" target="_blank" style="display:block;margin-top:6px;color:inherit;text-decoration:underline;">📎 ${m.attachmentName || 'تحميل الملف'}</a>`;
+        }
+      }
       const responseBlock = m.response
         ? `<div style="margin-top:6px;padding:6px 8px;background:rgba(0,0,0,.06);border-radius:8px;font-size:12px;">رد المندوب: ${m.response}</div>`
         : (m.requiresResponse ? `<div style="margin-top:6px;font-size:11px;color:#eab308;">⏳ بانتظار رد المندوب</div>` : '');
@@ -80,6 +88,7 @@ function renderMessages(messages) {
       return `
         <div class="msg-bubble ${isAdmin ? 'msg-admin' : 'msg-driver'}">
           ${m.text}
+          ${attachmentBlock}
           ${responseBlock}
           <div class="msg-time">${time}</div>
           ${isAdmin ? `
@@ -132,6 +141,55 @@ window.resendMessage = async function (messageId) {
 document.getElementById('sendBtn').addEventListener('click', () => sendMessage());
 document.getElementById('messageInput').addEventListener('keypress', (e) => {
   if (e.key === 'Enter') sendMessage();
+});
+
+document.getElementById('attachBtn')?.addEventListener('click', () => {
+  document.getElementById('attachFileInput').click();
+});
+
+document.getElementById('attachFileInput')?.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file || !currentDriverId) return;
+
+  if (file.size > 5 * 1024 * 1024) {
+    alert('حجم الملف كبير جدًا، الحد الأقصى 5 ميجابايت');
+    e.target.value = '';
+    return;
+  }
+
+  const statusEl = document.getElementById('attachStatus');
+  statusEl.textContent = 'جاري رفع الملف...';
+
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const base64 = reader.result.split(',')[1];
+    try {
+      const res = await fetch(`${NAHJ_API_URL}/attachments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          fileBase64: base64,
+          fileName: file.name,
+          mimeType: file.type,
+          driverId: currentDriverId,
+          caption: document.getElementById('messageInput').value.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        statusEl.textContent = '';
+        document.getElementById('messageInput').value = '';
+        await loadMessages();
+        await loadConversations();
+      } else {
+        statusEl.textContent = data.message || 'فشل الرفع';
+      }
+    } catch (_) {
+      statusEl.textContent = 'تعذّر رفع الملف';
+    }
+    e.target.value = '';
+  };
+  reader.readAsDataURL(file);
 });
 
 async function sendMessage(presetText) {
