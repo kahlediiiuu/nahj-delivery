@@ -7,7 +7,7 @@ const gradeInfo = {
   A: { emoji: '👑', label: 'نخبة متميزة (A)', color: 'green' },
   B: { emoji: '🥈', label: 'أداء جيد جدًا (B)', color: 'green' },
   C: { emoji: '🥉', label: 'أداء متوسط (C)', color: 'yellow' },
-  D: { emoji: '⚠️', label: 'يحتاج تحسينًا - قائمة المتابعة (D)', color: 'red' },
+  F: { emoji: '⚠️', label: 'يحتاج تحسينًا - قائمة المتابعة (F)', color: 'red' },
 };
 
 router.post('/upload', verifyToken, requireAdmin, async (req, res) => {
@@ -23,9 +23,17 @@ router.post('/upload', verifyToken, requireAdmin, async (req, res) => {
       return db.collection('dailyPerformance').doc(`${r.driverId}_${date}`).set({
         driverId: r.driverId,
         date,
-        ordersAccepted: r.ordersAccepted || 0,
-        ordersRejected: r.ordersRejected || 0,
-        verificationCount: r.verificationCount || 0,
+        city: r.city || '',
+        grossOrders: r.grossOrders || 0,
+        completedOrders: r.completedOrders || 0,
+        completedOrdersInTime: r.completedOrdersInTime || 0,
+        failedOrders: r.failedOrders || 0,
+        onTimeDeliveryScore: r.onTimeDeliveryScore || 0,
+        verificationSuccessRate: r.verificationSuccessRate || 0,
+        finalQualityScore: r.finalQualityScore || 0,
+        ordersAccepted: r.completedOrders || 0,
+        ordersRejected: r.failedOrders || 0,
+        verificationCount: r.totalVerificationRequests || 0,
         categoryLabel: grade ? gradeInfo[grade].label : (r.categoryLabel || ''),
         categoryColor: grade ? gradeInfo[grade].color : (r.categoryColor || 'gray'),
         grade: grade || null,
@@ -40,7 +48,7 @@ router.post('/upload', verifyToken, requireAdmin, async (req, res) => {
       if (!r.driverId) return null;
       const grade = gradeInfo[r.grade];
       const gradeText = grade ? `${grade.emoji} تصنيفك: ${grade.label}` : '';
-      const text = `📊 تقريرك ليوم ${date} جاهز الآن!\n${gradeText}\n✅ مقبولة: ${r.ordersAccepted || 0} | ❌ مرفوضة: ${r.ordersRejected || 0}`;
+      const text = `📊 تقريرك ليوم ${date} جاهز الآن!\n${gradeText}\n✅ منجزة: ${r.completedOrders || 0}/${r.grossOrders || 0} | ⏱️ في الوقت: ${r.onTimeDeliveryScore || 0}%`;
       return db.collection('messages').add({
         driverId: r.driverId,
         sender: 'admin',
