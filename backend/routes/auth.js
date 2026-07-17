@@ -20,6 +20,23 @@ router.post('/driver/fcm-token', verifyToken, async (req, res) => {
   }
 });
 
+router.post('/driver/language', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'driver') {
+      return res.status(403).json({ success: false, message: 'مسموح للمناديب فقط' });
+    }
+    const { language } = req.body;
+    if (!['ar', 'en', 'bn'].includes(language)) {
+      return res.status(400).json({ success: false, message: 'لغة غير مدعومة' });
+    }
+    await db.collection('drivers').doc(req.user.driverId).set({ language }, { merge: true });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
 router.post('/admin/login', async (req, res) => {
   try {
     const { username, password } = req.body;
