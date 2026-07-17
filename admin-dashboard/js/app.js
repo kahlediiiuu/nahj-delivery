@@ -23,6 +23,22 @@ async function loadDrivers() {
   }
 }
 
+let activeStatFilter = null;
+
+function computeStatus(loc) {
+  const now = Date.now();
+  if (!loc) return { statusClass: 'status-offline', tags: ['offline'] };
+  const tags = [];
+  let statusClass;
+  if (loc.gpsEnabled === false) { statusClass = 'status-gpsoff'; tags.push('offline'); }
+  else if (now - loc.timestamp > 60000) { statusClass = 'status-offline'; tags.push('offline'); }
+  else if (loc.insideWorkZone === false) { statusClass = 'status-outside'; tags.push('online', 'outside'); }
+  else if (loc.status === 'stopped') { statusClass = 'status-idle'; tags.push('online', 'inside', 'stopped'); }
+  else { statusClass = 'status-online'; tags.push('online', 'inside', 'moving'); }
+  if (loc.insideWorkZone !== false) tags.push('inside'); else if (!tags.includes('outside')) tags.push('outside');
+  return { statusClass, tags };
+}
+
 function renderDriverList(filter = '') {
   const list = document.getElementById('driverList');
   list.innerHTML = '';
@@ -32,15 +48,9 @@ function renderDriverList(filter = '') {
     .filter(([id, info]) => !f || info.name?.toLowerCase().includes(f) || info.driverCode?.toLowerCase().includes(f))
     .forEach(([id, info]) => {
       const loc = latestLocations[id];
-      const now = Date.now();
-      let statusClass = 'status-offline';
-      if (loc) {
-        if (loc.gpsEnabled === false) statusClass = 'status-gpsoff';
-        else if (now - loc.timestamp > 60000) statusClass = 'status-offline';
-        else if (loc.insideWorkZone === false) statusClass = 'status-outside';
-        else if (loc.status === 'stopped') statusClass = 'status-idle';
-        else statusClass = 'status-online';
-      }
+      const { statusClass, tags } = computeStatus(loc);
+
+      if (activeStatFilter && !tags.includes(activeStatFilter)) return;
 
       const card = document.createElement('div');
       card.className = `driver-card ${statusClass}`;
@@ -53,6 +63,26 @@ function renderDriverList(filter = '') {
       list.appendChild(card);
     });
 }
+
+function setupStatFilters() {
+  const map = {
+    statOnline: 'online', statOffline: 'offline',
+    statInside: 'inside', statOutside: 'outside',
+    statMoving: 'moving', statStopped: 'stopped',
+  };
+  Object.entries(map).forEach(([elId, tag]) => {
+    const box = document.getElementById(elId)?.closest('.stat-box');
+    if (!box) return;
+    box.style.cursor = 'pointer';
+    box.addEventListener('click', () => {
+      activeStatFilter = activeStatFilter === tag ? null : tag;
+      document.querySelectorAll('.stat-box').forEach((b) => b.classList.remove('stat-active'));
+      if (activeStatFilter) box.classList.add('stat-active');
+      renderDriverList(document.getElementById('searchDriver').value);
+    });
+  });
+}
+setupStatFilters();
 
 document.getElementById('searchDriver').addEventListener('input', (e) => renderDriverList(e.target.value));
 
@@ -182,8 +212,18 @@ window.openDriverDetails = function (driverId) {
     <button onclick="window.sendCustomAlert('${driverId}')" style="width:100%;padding:10px;background:#0f172a;color:#fff;border:none;border-radius:6px;cursor:pointer;">
       إرسال التنبيه الآن
     </button>
+    ${loc.lat ? `
+    <button onclick="window.sendLocationProof('${driverId}', ${loc.lat}, ${loc.lng})" style="width:100%;padding:10px;margin-top:8px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;">
+      📍 إرسال موقعه الحالي المسجَّل له كإثبات
+    </button>` : ''}
   `;
   modal.classList.remove('hidden');
+};
+
+window.sendLocationProof = async function (driverId, lat, lng) {
+  const mapsLink = `https://www.google.com/maps?q=${lat},${lng}`;
+  const text = `📍 هذا هو موقعك المسجَّل لدينا الآن بالضبط:\n${mapsLink}\nإن كان مختلفًا عن موقعك الحقيقي، تأكد من تفعيل GPS بدقة عالية.`;
+  await sendAlertMessage(driverId, text);
 };
 
 document.getElementById('closeModal').addEventListener('click', () => {
@@ -283,3 +323,37 @@ socket.on('alerts:new', (alerts) => {
 
 loadDrivers();
 setInterval(loadDrivers, 60000);
+
+document.getElementById('openBroadcastBtn').addEventListener('click', () => {
+  document.getElementById('broadcastModal').classList.remove('hidden');
+});
+document.getElementById('closeBroadcastModal').addEventListener('click', () => {
+  document.getElementById('broadcastModal').classList.add('hidden');
+});
+
+document.getElementById('sendBroadcastBtn').addEventListener('click', async () => {
+  const ar = document.getElementById('broadcastTextAr').value.trim();
+  const en = document.getElementById('broadcastTextEn').value.trim();
+  const bn = document.getElementById('broadcastTextBn').value.trim();
+  if (!ar) return alert('النص العربي إلزامي على الأقل');
+
+  try {
+    const res = await fetch(`${API_URL}/messages/broadcast`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ target: 'all', texts: { ar, en: en || undefined, bn: bn || undefined } }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert(`تم إرسال الإشعار بنجاح إلى ${data.count} مندوب.`);
+      document.getElementById('broadcastModal').classList.add('hidden');
+      document.getElementById('broadcastTextAr').value = '';
+      document.getElementById('broadcastTextEn').value = '';
+      document.getElementById('broadcastTextBn').value = '';
+    } else {
+      alert(data.message || 'حدث خطأ');
+    }
+  } catch (_) {
+    alert('تعذّر الاتصال بالخادم');
+  }
+});
