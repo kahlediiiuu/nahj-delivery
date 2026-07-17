@@ -346,6 +346,15 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  static Future<bool> deleteAllMyMessages() async {
+    final token = await getToken();
+    final res = await http.delete(
+      Uri.parse('$baseUrl/messages/my/all'),
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 30));
+    return res.statusCode == 200;
+  }
+
   static Future<bool> deleteMessage(String messageId) async {
     final token = await getToken();
     final res = await http.delete(
