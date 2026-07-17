@@ -191,6 +191,26 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> sendAttachment({
+    required String fileBase64,
+    required String fileName,
+    required String mimeType,
+    String? caption,
+  }) async {
+    final token = await getToken();
+    final res = await http.post(
+      Uri.parse('$baseUrl/attachments'),
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      body: jsonEncode({
+        'fileBase64': fileBase64,
+        'fileName': fileName,
+        'mimeType': mimeType,
+        'caption': caption,
+      }),
+    ).timeout(const Duration(seconds: 60));
+    return jsonDecode(res.body);
+  }
+
   static Future<bool> sendMessage(String text) async {
     final token = await getToken();
     final res = await http.post(
