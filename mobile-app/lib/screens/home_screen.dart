@@ -13,6 +13,8 @@ import 'daily_log_screen.dart';
 import 'performance_report_screen.dart';
 import 'messages_screen.dart';
 import 'leave_request_screen.dart';
+import 'work_hours_screen.dart';
+import 'daily_notes_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,9 +32,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _consecutiveDays = 0;
   String? _whatsappNumber;
   String? _phoneNumber;
-  double _todayHours = 0;
-  double _todayDistance = 0;
-  String _todayRating = '--';
+  String _currentGrade = '';
+  String _currentGradeLabel = '';
 
   @override
   void initState() {
@@ -52,11 +53,15 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final result = await ApiService.getMyReport();
       if (mounted) {
+        setState(() => _consecutiveDays = result['consecutiveDays'] ?? 0);
+      }
+    } catch (_) {}
+    try {
+      final perf = await ApiService.getMyPerformance();
+      if (mounted && perf['found'] == true) {
         setState(() {
-          _consecutiveDays = result['consecutiveDays'] ?? 0;
-          _todayHours = (result['hoursWorked'] ?? 0).toDouble();
-          _todayDistance = (result['distanceKm'] ?? 0).toDouble();
-          _todayRating = result['rating']?.toString() ?? '--';
+          _currentGrade = perf['grade']?.toString() ?? '';
+          _currentGradeLabel = perf['categoryLabel']?.toString() ?? '';
         });
       }
     } catch (_) {}
@@ -404,15 +409,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 16),
 
-            Row(
-              children: [
-                Expanded(child: _statCard('⏱️', '$_todayHours', 'ساعة اليوم', Colors.blue)),
-                const SizedBox(width: 10),
-                Expanded(child: _statCard('🛣️', '$_todayDistance', 'كم اليوم', Colors.green)),
-                const SizedBox(width: 10),
-                Expanded(child: _statCard('⭐', _todayRating, 'تقييمك', Colors.orange)),
-              ],
-            ),
+            if (_currentGrade.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                child: Row(
+                  children: [
+                    const Text('🏆', style: TextStyle(fontSize: 26)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('فئتك الحالية', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          Text(_currentGradeLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        ],
+                      ),
+                    ),
+                    if (_unreadMessages > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                        child: Text('🔔 $_unreadMessages', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                  ],
+                ),
+              ),
 
             const SizedBox(height: 20),
 
@@ -425,9 +448,11 @@ class _HomeScreenState extends State<HomeScreen> {
               childAspectRatio: 1.3,
               children: [
                 _featureCard('🏆', AppStrings.get('performanceReport'), Colors.indigo, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PerformanceReportScreen()))),
-                _featureCard('📊', AppStrings.get('myDailyReport'), Colors.blue, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyReportScreen()))),
                 _featureCard('📦', AppStrings.get('dailyLog'), Colors.teal, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DailyLogScreen()))),
                 _featureCard('🗓️', AppStrings.get('requestLeave'), Colors.deepPurple, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LeaveRequestScreen()))),
+                _featureCard('⏱️', 'ساعات عملي', Colors.blue, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WorkHoursScreen()))),
+                _featureCard('📝', 'ملاحظة يومية', Colors.orange, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DailyNotesScreen()))),
+                _featureCard('📊', AppStrings.get('myDailyReport'), Colors.blueGrey, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyReportScreen()))),
               ],
             ),
 
@@ -460,25 +485,6 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 20),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _statCard(String emoji, String value, String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2))],
-      ),
-      child: Column(
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 20)),
-          const SizedBox(height: 6),
-          Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
-          Text(label, style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
-        ],
       ),
     );
   }
