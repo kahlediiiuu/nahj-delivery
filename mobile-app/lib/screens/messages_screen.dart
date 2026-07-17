@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 import '../services/app_strings.dart';
 
@@ -13,6 +16,7 @@ class MessagesScreen extends StatefulWidget {
 class _MessagesScreenState extends State<MessagesScreen> {
   List<dynamic> _messages = [];
   bool _loading = true;
+  bool _uploading = false;
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   Timer? _pollTimer;
@@ -51,8 +55,87 @@ class _MessagesScreenState extends State<MessagesScreen> {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
     _controller.clear();
-    await ApiService.sendMessage(text);
+    try {
+      await ApiService.sendMessage(text);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.get('connectionError')), backgroundColor: Colors.red),
+        );
+      }
+    }
     _load();
+  }
+
+  Future<void> _pickAndSendFile() async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+      if (picked == null) return;
+
+      setState(() => _uploading = true);
+      final bytes = await File(picked.path).readAsBytes();
+
+      if (bytes.length > 5 * 1024 * 1024) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('حجم الملف كبير جدًا (الحد الأقصى 5 ميجابايت)'), backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+
+      final base64 = base64Encode(bytes);
+      final result = await ApiService.sendAttachment(
+        fileBase64: base64,
+        fileName: picked.name,
+        mimeType: 'image/jpeg',
+        caption: _controller.text.trim().isEmpty ? null : _controller.text.trim(),
+      );
+
+      if (result['success'] == true) {
+        _controller.clear();
+        _load();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? 'تعذّر رفع الملف'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذّر رفع الملف: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Widget _buildAttachment(Map m) {
+    final url = m['attachmentUrl'];
+    if (url == null) return const SizedBox.shrink();
+    final type = m['attachmentType']?.toString() ?? '';
+    if (type.startsWith('image/')) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.network(url, width: 180, fit: BoxFit.cover),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.insert_drive_file, size: 18),
+          const SizedBox(width: 4),
+          Flexible(child: Text(m['attachmentName']?.toString() ?? 'ملف مرفق', style: const TextStyle(decoration: TextDecoration.underline))),
+        ],
+      ),
+    );
   }
 
   @override
@@ -83,20 +166,32 @@ class _MessagesScreenState extends State<MessagesScreen> {
                                 color: isMine ? Colors.blue[50] : const Color(0xFF0F172A),
                                 borderRadius: BorderRadius.circular(14),
                               ),
-                              child: Text(
-                                m['text'] ?? '',
-                                style: TextStyle(color: isMine ? Colors.black87 : Colors.white),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    m['text'] ?? '',
+                                    style: TextStyle(color: isMine ? Colors.black87 : Colors.white),
+                                  ),
+                                  _buildAttachment(m),
+                                ],
                               ),
                             ),
                           );
                         },
                       ),
           ),
+          if (_uploading) const LinearProgressIndicator(),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(10),
               child: Row(
                 children: [
+                  IconButton(
+                    onPressed: _uploading ? null : _pickAndSendFile,
+                    icon: const Icon(Icons.attach_file),
+                    tooltip: 'إرفاق صورة وإرسالها للإدارة',
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _controller,
