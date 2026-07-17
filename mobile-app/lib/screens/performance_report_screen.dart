@@ -10,7 +10,7 @@ class PerformanceReportScreen extends StatefulWidget {
 }
 
 class _PerformanceReportScreenState extends State<PerformanceReportScreen> {
-  DateTime _selectedDate = DateTime.now();
+  DateTime _selectedDate = DateTime.now().subtract(const Duration(days: 1));
   bool _loading = true;
   Map<String, dynamic>? _data;
   String? _error;
@@ -48,42 +48,68 @@ class _PerformanceReportScreenState extends State<PerformanceReportScreen> {
   Color _colorFor(String? colorKey) {
     switch (colorKey) {
       case 'green':
-        return Colors.green;
+        return const Color(0xFF16A34A);
       case 'yellow':
-        return Colors.orange;
+        return const Color(0xFFEAB308);
       case 'red':
-        return Colors.red;
+        return const Color(0xFFDC2626);
       default:
         return Colors.blueGrey;
+    }
+  }
+
+  IconData _iconFor(String? grade) {
+    switch (grade) {
+      case 'A':
+        return Icons.emoji_events;
+      case 'B':
+        return Icons.star;
+      case 'C':
+        return Icons.thumb_up;
+      case 'F':
+        return Icons.warning_amber_rounded;
+      default:
+        return Icons.info;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final found = _data != null && _data!['found'] == true;
+    final hidden = _data != null && _data!['hidden'] == true;
     final color = found ? _colorFor(_data!['categoryColor']) : Colors.grey;
+    final grade = found ? _data!['grade']?.toString() : null;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(title: Text(AppStrings.get('performanceReport'))),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // شريط التنقل بين الأيام
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(icon: const Icon(Icons.chevron_right), onPressed: () => _changeDay(-1)),
-                Text(_dateKey, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                IconButton(icon: const Icon(Icons.chevron_left), onPressed: () => _changeDay(1)),
-              ],
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(icon: const Icon(Icons.chevron_right), onPressed: () => _changeDay(-1)),
+                  Text(_dateKey, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  IconButton(icon: const Icon(Icons.chevron_left), onPressed: () => _changeDay(1)),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             if (_loading)
               const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator()))
             else if (_error != null)
               Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+            else if (hidden)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Center(child: Text('التقارير غير متاحة حاليًا لحسابك', style: TextStyle(color: Colors.grey.shade600))),
+              )
             else if (!found)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 40),
@@ -92,42 +118,95 @@ class _PerformanceReportScreenState extends State<PerformanceReportScreen> {
                 ),
               )
             else ...[
-              // بطاقة الفئة الملوّنة الكبيرة
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: color, width: 2),
+                  gradient: LinearGradient(colors: [color.withOpacity(0.9), color.withOpacity(0.6)]),
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: [BoxShadow(color: color.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 8))],
                 ),
                 child: Column(
                   children: [
-                    Icon(
-                      color == Colors.green ? Icons.star : (color == Colors.red ? Icons.warning : Icons.info),
-                      size: 48,
-                      color: color,
-                    ),
-                    const SizedBox(height: 8),
+                    Icon(_iconFor(grade), size: 52, color: Colors.white),
+                    const SizedBox(height: 10),
                     Text(
                       _data!['categoryLabel']?.toString().isNotEmpty == true
                           ? _data!['categoryLabel']
                           : AppStrings.get('category'),
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
+                    if (_data!['city'] != null && _data!['city'].toString().isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text('📍 ${_data!['city']}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                    ],
                   ],
                 ),
               ),
+
               const SizedBox(height: 20),
-              _statRow(AppStrings.get('ordersAccepted'), '${_data!['ordersAccepted'] ?? 0}', Icons.check_circle, Colors.green),
-              _statRow(AppStrings.get('ordersRejected'), '${_data!['ordersRejected'] ?? 0}', Icons.cancel, Colors.red),
-              _statRow(AppStrings.get('verificationCount'), '${_data!['verificationCount'] ?? 0}', Icons.verified, Colors.blue),
+
+              if (_data!['finalQualityScore'] != null && (_data!['finalQualityScore'] as num) > 0)
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 70, height: 70,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            CircularProgressIndicator(
+                              value: (_data!['finalQualityScore'] as num).toDouble().clamp(0, 1),
+                              strokeWidth: 7,
+                              backgroundColor: Colors.grey.shade200,
+                              color: color,
+                            ),
+                            Text('${(((_data!['finalQualityScore'] as num) * 100)).toStringAsFixed(0)}%',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Text('درجة الجودة النهائية', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      ),
+                    ],
+                  ),
+                ),
+
+              const SizedBox(height: 16),
+
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 1.5,
+                children: [
+                  _statCard('📦', '${_data!['completedOrders'] ?? 0}/${_data!['grossOrders'] ?? 0}', 'طلبات منجزة', Colors.green),
+                  _statCard('❌', '${_data!['failedOrders'] ?? 0}', 'طلبات فاشلة', Colors.red),
+                  _statCard('⏱️', '${_data!['onTimeDeliveryScore'] ?? 0}%', 'الالتزام بالوقت', Colors.blue),
+                  _statCard('✅', '${_data!['verificationSuccessRate'] ?? 0}%', 'نجاح التحقق', Colors.indigo),
+                ],
+              ),
+
               if (_data!['notes'] != null && _data!['notes'].toString().isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(_data!['notes']),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('📝 ملاحظة الإدارة', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      Text(_data!['notes']),
+                    ],
                   ),
                 ),
               ],
@@ -138,13 +217,29 @@ class _PerformanceReportScreenState extends State<PerformanceReportScreen> {
     );
   }
 
-  Widget _statRow(String label, String value, IconData icon, Color color) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      child: ListTile(
-        leading: Icon(icon, color: color, size: 32),
-        title: Text(label),
-        trailing: Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+  Widget _statCard(String emoji, String value, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2))],
+      ),
+      child: Row(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 22)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: color)),
+                Text(label, style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
