@@ -187,4 +187,57 @@ class _MessagesScreenState extends State<MessagesScreen> {
                             child: Container(
                               margin: const EdgeInsets.symmetric(vertical: 4),
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                              constraints: BoxConstraints(maxWidth:
+                              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
+                              decoration: BoxDecoration(
+                                color: isMine ? Colors.blue[50] : const Color(0xFF0F172A),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    m['text'] ?? '',
+                                    style: TextStyle(color: isMine ? Colors.black87 : Colors.white),
+                                  ),
+                                  _buildAttachment(m),
+                                ],
+                              ),
+                            ),
+                            ),
+                          );
+                        },
+                      ),
+          ),
+          if (_uploading) const LinearProgressIndicator(),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: _uploading ? null : _pickAndSendFile,
+                    icon: const Icon(Icons.attach_file),
+                    tooltip: 'إرفاق صورة وإرسالها للإدارة',
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      decoration: InputDecoration(
+                        hintText: AppStrings.get('typeMessage'),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      ),
+                      onSubmitted: (_) => _send(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(onPressed: _send, icon: const Icon(Icons.send)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
