@@ -57,7 +57,7 @@
     <table>
       <thead>
         <tr>
-          <th>الرقم التعريفي الدائم</th><th>الاسم</th><th>رقم المندوب (دخول)</th><th>رقم الجوال</th><th>رمز المطابقة</th><th>الحالة</th><th>إجراءات</th>
+          <th>الرقم التعريفي الدائم</th><th>الاسم</th><th>رقم المندوب (دخول)</th><th>رقم الجوال</th><th>رمز المطابقة</th><th>المدينة</th><th>الحالة</th><th>إجراءات</th>
         </tr>
       </thead>
       <tbody id="driversTableBody"></tbody>
@@ -76,6 +76,16 @@
       <input type="text" id="inputCode">
       <label>رمز المطابقة (لمطابقة تلقائية عند رفع ملفات الأداء - اختياري)</label>
       <input type="text" id="inputMatchCode" placeholder="مثال: رقم موظف هنقرستيشن">
+      <label>المدينة</label>
+      <select id="inputCity">
+        <option value="">— غير محدد —</option>
+        <option value="الرياض">الرياض</option>
+        <option value="جدة">جدة</option>
+        <option value="الدمام">الدمام</option>
+        <option value="مكة">مكة</option>
+        <option value="المدينة">المدينة</option>
+        <option value="ينبع">ينبع</option>
+      </select>
       <label id="passwordLabel">كلمة المرور</label>
       <input type="password" id="inputPassword">
       <p id="modalError" style="color:#dc2626;font-size:13px;margin-top:8px;"></p>
