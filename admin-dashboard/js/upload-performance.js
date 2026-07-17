@@ -19,18 +19,20 @@ loadDrivers();
 const yesterday = new Date(Date.now() - 86400000);
 document.getElementById('reportDate').valueAsDate = yesterday;
 
-function guessDriverId(rawName, rowValues) {
-  const allValuesText = rowValues.map((v) => String(v).trim().toLowerCase()).join(' | ');
-
-  const byCode = driversList.find(
-    (d) => d.matchCode && allValuesText.includes(String(d.matchCode).trim().toLowerCase())
-  );
+function matchDriverByRiderId(riderId) {
+  if (!riderId) return '';
+  const clean = String(riderId).trim();
+  const byCode = driversList.find((d) => d.matchCode && String(d.matchCode).trim() === clean);
   if (byCode) return byCode.id;
+  const byDriverCode = driversList.find((d) => d.driverCode && String(d.driverCode).trim() === clean);
+  return byDriverCode ? byDriverCode.id : '';
+}
 
-  if (!rawName) return '';
-  const clean = String(rawName).trim().toLowerCase();
-  const byName = driversList.find((d) => d.name && d.name.trim().toLowerCase() === clean);
-  return byName ? byName.id : '';
+function toPercent(val) {
+  if (val === undefined || val === null || val === '') return 0;
+  if (typeof val === 'string' && val.includes('%')) return parseFloat(val.replace('%', '')) || 0;
+  const num = Number(val);
+  return num <= 1 ? +(num * 100).toFixed(2) : num;
 }
 
 document.getElementById('fileInput').addEventListener('change', (e) => {
@@ -45,20 +47,28 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
     const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
 
     parsedRows = rows.map((row) => {
-      const keys = Object.keys(row);
-      const values = Object.values(row);
       const findVal = (patterns) => {
-        const key = keys.find((k) => patterns.some((p) => k.toLowerCase().includes(p)));
-        return key ? row[key] : '';
+        const key = Object.keys(row).find((k) => patterns.some((p) => k.toLowerCase().includes(p)));
+        return key !== undefined ? row[key] : '';
       };
-      const name = findVal(['اسم', 'name', 'مندوب', 'driver']);
+
+      const riderId = findVal(['rider_id', 'rider id', 'معرف', 'id']);
+      const segment = String(findVal(['segment', 'الفئة', 'فئة'])).trim().toUpperCase();
+      const completedOrdersExact = row['completed_orders'] !== undefined ? row['completed_orders'] : findVal(['completed_orders']);
+
       return {
-        rawName: name,
-        driverId: guessDriverId(name, values),
-        ordersAccepted: Number(findVal(['مقبول', 'accept', 'قبول'])) || 0,
-        ordersRejected: Number(findVal(['مرفوض', 'reject', 'رفض'])) || 0,
-        verificationCount: Number(findVal(['تحقق', 'verif'])) || 0,
-        grade: '',
+        riderId,
+        driverId: matchDriverByRiderId(riderId),
+        city: findVal(['city', 'المدينة']),
+        grossOrders: Number(findVal(['gross_orders', 'إجمالي'])) || 0,
+        completedOrders: Number(completedOrdersExact) || 0,
+        completedOrdersInTime: Number(findVal(['completed_orders_in_time', 'in_time'])) || 0,
+        failedOrders: Number(findVal(['failed_orders', 'مرفوض'])) || 0,
+        totalVerificationRequests: Number(findVal(['total_verification'])) || 0,
+        verificationSuccessRate: toPercent(findVal(['verification_success_rate'])),
+        onTimeDeliveryScore: toPercent(findVal(['on_time_delivery_score'])),
+        finalQualityScore: Number(findVal(['final_delivery_quality_score', 'quality_score'])) || 0,
+        grade: ['A', 'B', 'C', 'F'].includes(segment) ? segment : '',
       };
     });
 
@@ -69,11 +79,11 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
 });
 
 const gradeOptions = [
-  { value: '', label: '— اختر الفئة —' },
+  { value: '', label: '— بدون فئة —' },
   { value: 'A', label: '👑 A - نخبة متميزة' },
   { value: 'B', label: '🥈 B - أداء جيد جدًا' },
   { value: 'C', label: '🥉 C - أداء متوسط' },
-  { value: 'D', label: '⚠️ D - قائمة المتابعة' },
+  { value: 'F', label: '⚠️ F - قائمة المتابعة' },
 ];
 
 function renderPreview() {
@@ -82,16 +92,16 @@ function renderPreview() {
     .map(
       (row, i) => `
     <tr style="${row.driverId ? '' : 'background:#fef2f2;'}">
-      <td>${row.rawName}</td>
+      <td style="font-family:monospace;">${row.riderId}</td>
       <td>
         <select onchange="updateRow(${i}, 'driverId', this.value)">
-          <option value="">— اختر المندوب —</option>
+          <option value="">— لم تُطابَق —</option>
           ${driversList.map((d) => `<option value="${d.id}" ${row.driverId === d.id ? 'selected' : ''}>${d.name} (#${d.driverCode})</option>`).join('')}
         </select>
       </td>
-      <td><input type="number" value="${row.ordersAccepted}" onchange="updateRow(${i}, 'ordersAccepted', this.value)" style="width:70px"></td>
-      <td><input type="number" value="${row.ordersRejected}" onchange="updateRow(${i}, 'ordersRejected', this.value)" style="width:70px"></td>
-      <td><input type="number" value="${row.verificationCount}" onchange="updateRow(${i}, 'verificationCount', this.value)" style="width:70px"></td>
+      <td>${row.city}</td>
+      <td>${row.completedOrders}/${row.grossOrders}</td>
+      <td>${row.onTimeDeliveryScore}%</td>
       <td>
         <select onchange="updateRow(${i}, 'grade', this.value)">
           ${gradeOptions.map((g) => `<option value="${g.value}" ${row.grade === g.value ? 'selected' : ''}>${g.label}</option>`).join('')}
@@ -100,10 +110,13 @@ function renderPreview() {
     </tr>`
     )
     .join('');
+
+  const matchedCount = parsedRows.filter((r) => r.driverId).length;
+  document.getElementById('matchSummary').textContent = `تمت مطابقة ${matchedCount} من أصل ${parsedRows.length} صفًا تلقائيًا عبر رمز المطابقة (rider_id).`;
 }
 
 window.updateRow = function (index, field, value) {
-  parsedRows[index][field] = field.includes('Count') || field.includes('Accepted') || field.includes('Rejected') ? Number(value) : value;
+  parsedRows[index][field] = value;
 };
 
 document.getElementById('submitBtn').addEventListener('click', async () => {
@@ -112,7 +125,7 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
   const validRows = parsedRows.filter((r) => r.driverId);
 
   if (validRows.length === 0) {
-    msg.textContent = 'لم يتم ربط أي صف بمندوب، تأكد من اختيار المندوب لكل صف (أو ضبط رمز المطابقة له من صفحة إدارة المناديب)';
+    msg.textContent = 'لم يتم ربط أي صف بمندوب. تأكد من ضبط "رمز المطابقة" لكل مندوب (نفس قيمة rider_id) من صفحة إدارة المناديب.';
     msg.style.color = '#dc2626';
     return;
   }
@@ -125,7 +138,7 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
     });
     const data = await res.json();
     if (data.success) {
-      msg.textContent = `تم رفع تقرير ${data.count} مندوب بنجاح ليوم ${date}، ووصلهم إشعار فوري بذلك.`;
+      msg.textContent = `تم رفع تقرير ${data.count} مندوب بنجاح ليوم ${date} (وسُجِّل ${data.absentCount} كغائبين)، ووصلهم إشعار فوري بذلك.`;
       msg.style.color = '#16a34a';
     } else {
       msg.textContent = data.message || 'حدث خطأ';
