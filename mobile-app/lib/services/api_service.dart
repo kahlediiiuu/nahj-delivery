@@ -231,6 +231,34 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  static Future<Map<String, dynamic>> getAnnouncements() async {
+    final token = await getToken();
+    final res = await http.get(
+      Uri.parse('$baseUrl/announcements'),
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 30));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> sendAnnouncementNote({
+    required String announcementId,
+    required String note,
+    String? attachmentData,
+    String? attachmentType,
+  }) async {
+    final token = await getToken();
+    final res = await http.post(
+      Uri.parse('$baseUrl/announcements/$announcementId/notes'),
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      body: jsonEncode({
+        'note': note,
+        'attachmentData': attachmentData,
+        'attachmentType': attachmentType,
+      }),
+    ).timeout(const Duration(seconds: 60));
+    return jsonDecode(res.body);
+  }
+
   static Future<Map<String, dynamic>> getMyReport({String? date}) async {
     final token = await getToken();
     final uri = date != null
