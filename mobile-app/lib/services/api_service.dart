@@ -118,6 +118,22 @@ class ApiService {
     } catch (_) {}
   }
 
+  // الدالة التي تم إضافتها لحل مشكلة بناء التطبيق وتحديث اللغة لدى السيرفر
+  static Future<void> registerLanguage(String languageCode) async {
+    final token = await getToken();
+    if (token == null) return;
+    try {
+      await http.post(
+        Uri.parse('$baseUrl/auth/driver/language'), // المسار الافتراضي لتحديث اللغة
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'language': languageCode}),
+      ).timeout(const Duration(seconds: 15));
+    } catch (_) {}
+  }
+
   static Future<bool> respondToMessage(String messageId, String response) async {
     final token = await getToken();
     final res = await http.post(
