@@ -1,13 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { db, bucket } = require('../config/firebase');
-const { verifyToken, requireAdmin } = require('../middleware/auth');
+const { db } = require('../config/firebase');
+const { verifyToken } = require('../middleware/auth');
 const { sendPushToDriver } = require('../utils/push');
-const crypto = require('crypto');
 
 router.use(verifyToken);
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_FILE_SIZE = 700 * 1024;
 
 router.post('/', async (req, res) => {
   try {
@@ -19,7 +18,7 @@ router.post('/', async (req, res) => {
 
     const buffer = Buffer.from(fileBase64, 'base64');
     if (buffer.length > MAX_FILE_SIZE) {
-      return res.status(413).json({ success: false, message: 'حجم الملف كبير جدًا (الحد الأقصى 5 ميجابايت)' });
+      return res.status(413).json({ success: false, message: 'حجم الملف كبير جدًا (الحد الأقصى 700 كيلوبايت تقريبًا)' });
     }
 
     let driverId;
@@ -33,19 +32,12 @@ router.post('/', async (req, res) => {
       sender = 'driver';
     }
 
-    const safeName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-    const storagePath = `attachments/${driverId}/${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${safeName}`;
-    const fileRef = bucket.file(storagePath);
-    await fileRef.save(buffer, { metadata: { contentType: mimeType || 'application/octet-stream' } });
-    await fileRef.makePublic();
-    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
-
     const now = Date.now();
     const docRef = await db.collection('messages').add({
       driverId,
       sender,
       text: caption || (sender === 'admin' ? '📎 ملف مرفق من الإدارة' : '📎 ملف مرفق من المندوب'),
-      attachmentUrl: publicUrl,
+      attachmentData: fileBase64,
       attachmentType: mimeType || '',
       attachmentName: fileName,
       createdAt: now,
@@ -59,7 +51,7 @@ router.post('/', async (req, res) => {
       await sendPushToDriver(driverId, '📎 وصلك ملف جديد من الإدارة', caption || fileName, { messageId: docRef.id });
     }
 
-    res.json({ success: true, id: docRef.id, url: publicUrl });
+    res.json({ success: true, id: docRef.id });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'تعذّر رفع الملف، حاول مجددًا' });
