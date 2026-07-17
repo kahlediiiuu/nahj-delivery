@@ -165,61 +165,26 @@ class _MessagesScreenState extends State<MessagesScreen> {
                         itemBuilder: (ctx, i) {
                           final m = _messages[i];
                           final isMine = m['sender'] == 'driver';
-                          return Align(
+                          return GestureDetector(
+                            onLongPress: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  content: const Text('حذف هذه الرسالة؟'),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+                                    TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('حذف', style: TextStyle(color: Colors.red))),
+                                  ],
+                                ),
+                              );
+                              if (confirm == true) {
+                                await ApiService.deleteMessage(m['id']);
+                                _load();
+                              }
+                            },
+                            child: Align(
                             alignment: isMine ? Alignment.centerLeft : Alignment.centerRight,
                             child: Container(
                               margin: const EdgeInsets.symmetric(vertical: 4),
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
-                              decoration: BoxDecoration(
-                                color: isMine ? Colors.blue[50] : const Color(0xFF0F172A),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    m['text'] ?? '',
-                                    style: TextStyle(color: isMine ? Colors.black87 : Colors.white),
-                                  ),
-                                  _buildAttachment(m),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-          ),
-          if (_uploading) const LinearProgressIndicator(),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: _uploading ? null : _pickAndSendFile,
-                    icon: const Icon(Icons.attach_file),
-                    tooltip: 'إرفاق صورة وإرسالها للإدارة',
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      decoration: InputDecoration(
-                        hintText: AppStrings.get('typeMessage'),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      ),
-                      onSubmitted: (_) => _send(),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(onPressed: _send, icon: const Icon(Icons.send)),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+                              constraints: BoxConstraints(maxWidth:
