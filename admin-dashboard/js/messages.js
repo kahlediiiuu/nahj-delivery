@@ -43,10 +43,14 @@ function renderConvList(filter = '') {
     .join('');
 }
 
+let currentMessages = [];
+
 window.openConversation = async function (driverId) {
   currentDriverId = driverId;
   renderConvList(document.getElementById('convSearch')?.value || '');
   document.getElementById('chatInputRow').style.display = 'flex';
+  document.getElementById('chatToolsRow').style.display = 'flex';
+  document.getElementById('chatSearchInput').value = '';
   await loadMessages();
 };
 
@@ -57,9 +61,13 @@ async function loadMessages() {
   });
   const data = await res.json();
   if (!data.success) return;
+  currentMessages = data.messages;
+  renderMessages(currentMessages);
+}
 
+function renderMessages(messages) {
   const container = document.getElementById('chatMessages');
-  container.innerHTML = data.messages
+  container.innerHTML = messages
     .map((m) => {
       const time = new Date(m.createdAt).toLocaleString('ar-SA', {
         year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -84,6 +92,25 @@ async function loadMessages() {
     .join('');
   container.scrollTop = container.scrollHeight;
 }
+
+document.getElementById('chatSearchInput')?.addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  if (!q) return renderMessages(currentMessages);
+  renderMessages(currentMessages.filter((m) => m.text.toLowerCase().includes(q)));
+});
+
+window.deleteWholeConversation = async function () {
+  if (!currentDriverId) return;
+  if (!confirm('هل أنت متأكد من حذف كامل المحادثة مع هذا المندوب نهائيًا؟ لا يمكن التراجع.')) return;
+  await fetch(`${NAHJ_API_URL}/messages/driver/${currentDriverId}/all`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  currentMessages = [];
+  renderMessages([]);
+  loadConversations();
+  alert('تم حذف المحادثة بالكامل.');
+};
 
 window.deleteMessage = async function (messageId) {
   if (!confirm('حذف هذه الرسالة نهائياً من السجل؟')) return;
