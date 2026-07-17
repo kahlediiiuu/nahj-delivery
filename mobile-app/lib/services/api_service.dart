@@ -36,9 +36,11 @@ class ApiService {
 
   static Future<bool> sendLocation(Map<String, dynamic> payload) async {
     await flushQueue();
+
     try {
       final token = await getToken();
       if (token == null) return false;
+
       final res = await http
           .post(
             Uri.parse('$baseUrl/location/update'),
@@ -49,6 +51,7 @@ class ApiService {
             body: jsonEncode(payload),
           )
           .timeout(const Duration(seconds: 10));
+
       if (res.statusCode == 200) return true;
       await _enqueue(payload);
       return false;
@@ -64,6 +67,7 @@ class ApiService {
     final withTimestamp = Map<String, dynamic>.from(payload);
     withTimestamp['timestamp'] = DateTime.now().millisecondsSinceEpoch;
     list.add(jsonEncode(withTimestamp));
+
     while (list.length > _maxQueueSize) {
       list.removeAt(0);
     }
@@ -74,8 +78,10 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     final list = prefs.getStringList(_queueKey) ?? <String>[];
     if (list.isEmpty) return;
+
     final token = await getToken();
     if (token == null) return;
+
     try {
       final points = list.map((s) => jsonDecode(s)).toList();
       final res = await http
@@ -88,6 +94,7 @@ class ApiService {
             body: jsonEncode({'points': points}),
           )
           .timeout(const Duration(seconds: 15));
+
       if (res.statusCode == 200) {
         await prefs.remove(_queueKey);
       }
@@ -303,6 +310,15 @@ class ApiService {
       }),
     ).timeout(const Duration(seconds: 60));
     return jsonDecode(res.body);
+  }
+
+  static Future<bool> deleteMessage(String messageId) async {
+    final token = await getToken();
+    final res = await http.delete(
+      Uri.parse('$baseUrl/messages/$messageId'),
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 30));
+    return res.statusCode == 200;
   }
 
   static Future<bool> sendMessage(String text) async {
