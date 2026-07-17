@@ -4,6 +4,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:timezone/timezone.dart' as tz;
 import 'services/location_service.dart';
 import 'services/app_strings.dart';
 import 'screens/login_screen.dart';
@@ -18,6 +20,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> main() async {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+
+    try {
+      tz_data.initializeTimeZones();
+    } catch (_) {}
 
     FlutterError.onError = (FlutterErrorDetails details) async {
       await _saveCrashLog('Flutter Error: ${details.exceptionAsString()}\n${details.stack}');
