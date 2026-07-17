@@ -15,6 +15,7 @@ import 'messages_screen.dart';
 import 'leave_request_screen.dart';
 import 'work_hours_screen.dart';
 import 'daily_notes_screen.dart';
+import 'announcements_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -453,6 +454,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _featureCard('⏱️', 'ساعات عملي', Colors.blue, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WorkHoursScreen()))),
                 _featureCard('📝', 'ملاحظة يومية', Colors.orange, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DailyNotesScreen()))),
                 _featureCard('📊', AppStrings.get('myDailyReport'), Colors.blueGrey, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyReportScreen()))),
+                _featureCard('📢', 'أخبار الشركة', Colors.pink, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AnnouncementsScreen()))),
               ],
             ),
 
