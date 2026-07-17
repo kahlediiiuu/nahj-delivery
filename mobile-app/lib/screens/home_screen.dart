@@ -30,6 +30,9 @@ class _HomeScreenState extends State<HomeScreen> {
   int _consecutiveDays = 0;
   String? _whatsappNumber;
   String? _phoneNumber;
+  double _todayHours = 0;
+  double _todayDistance = 0;
+  String _todayRating = '--';
 
   @override
   void initState() {
@@ -41,14 +44,29 @@ class _HomeScreenState extends State<HomeScreen> {
     _setupPushNotifications();
     _loadAchievements();
     _loadContactInfo();
+    ApiService.registerLanguage(AppStrings.currentLang);
     _unreadTimer = Timer.periodic(const Duration(seconds: 15), (_) => _refreshUnread());
   }
 
   Future<void> _loadAchievements() async {
     try {
       final result = await ApiService.getMyReport();
-      if (mounted) setState(() => _consecutiveDays = result['consecutiveDays'] ?? 0);
+      if (mounted) {
+        setState(() {
+          _consecutiveDays = result['consecutiveDays'] ?? 0;
+          _todayHours = (result['hoursWorked'] ?? 0).toDouble();
+          _todayDistance = (result['distanceKm'] ?? 0).toDouble();
+          _todayRating = result['rating']?.toString() ?? '--';
+        });
+      }
     } catch (_) {}
+  }
+
+  String _timeBasedGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return AppStrings.currentLang == 'ar' ? 'صباح الخير' : (AppStrings.currentLang == 'bn' ? 'শুভ সকাল' : 'Good morning');
+    if (hour < 17) return AppStrings.currentLang == 'ar' ? 'مساء الخير' : (AppStrings.currentLang == 'bn' ? 'শুভ বিকাল' : 'Good afternoon');
+    return AppStrings.currentLang == 'ar' ? 'مساء الخير' : (AppStrings.currentLang == 'bn' ? 'শুভ সন্ধ্যা' : 'Good evening');
   }
 
   Future<void> _loadContactInfo() async {
@@ -288,8 +306,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        title: Text('${AppStrings.get("welcome")}، $_driverName'),
+        elevation: 0,
+        backgroundColor: const Color(0xFF0F172A),
+        title: Text('${_timeBasedGreeting()}، $_driverName', style: const TextStyle(fontSize: 17)),
         actions: [
           Stack(
             children: [
@@ -314,93 +335,105 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
         ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _loadAchievements();
+          await _syncShiftStatus();
+        },
+        child: ListView(
+          padding: const EdgeInsets.all(16),
           children: [
-            if (_consecutiveDays > 0)
-              Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: Colors.amber),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('🔥', style: TextStyle(fontSize: 20)),
-                    const SizedBox(width: 8),
-                    Text(
-                      '$_consecutiveDays يوم عمل متتالي',
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF0F172A), Color(0xFF1E293B)]),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 12, offset: const Offset(0, 6))],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 10, height: 10,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _onShift ? Colors.greenAccent : Colors.white38,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _onShift ? AppStrings.get('onShift') : AppStrings.get('offShift'),
+                            style: const TextStyle(color: Colors.white70, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                      if (_consecutiveDays > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(color: Colors.amber.withOpacity(0.2), borderRadius: BorderRadius.circular(20)),
+                          child: Text('🔥 $_consecutiveDays يوم متتالي', style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _loading ? null : _toggleShift,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _onShift ? Colors.red.shade400 : Colors.green.shade400,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: _loading
+                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : Text(
+                              _onShift ? AppStrings.get('endShift') : AppStrings.get('startShift'),
+                              style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            Icon(
-              _onShift ? Icons.location_on : Icons.location_off,
-              size: 100,
-              color: _onShift ? Colors.green : Colors.grey,
             ),
+
             const SizedBox(height: 16),
-            Text(
-              _onShift ? AppStrings.get('onShift') : AppStrings.get('offShift'),
-              style: const TextStyle(fontSize: 18),
+
+            Row(
+              children: [
+                Expanded(child: _statCard('⏱️', '$_todayHours', 'ساعة اليوم', Colors.blue)),
+                const SizedBox(width: 10),
+                Expanded(child: _statCard('🛣️', '$_todayDistance', 'كم اليوم', Colors.green)),
+                const SizedBox(width: 10),
+                Expanded(child: _statCard('⭐', _todayRating, 'تقييمك', Colors.orange)),
+              ],
             ),
-            const SizedBox(height: 40),
-            ElevatedButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const PerformanceReportScreen()),
-              ),
-              icon: const Icon(Icons.workspace_premium),
-              label: Text(AppStrings.get('performanceReport')),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 14)),
+
+            const SizedBox(height: 20),
+
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1.3,
+              children: [
+                _featureCard('🏆', AppStrings.get('performanceReport'), Colors.indigo, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PerformanceReportScreen()))),
+                _featureCard('📊', AppStrings.get('myDailyReport'), Colors.blue, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyReportScreen()))),
+                _featureCard('📦', AppStrings.get('dailyLog'), Colors.teal, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DailyLogScreen()))),
+                _featureCard('🗓️', AppStrings.get('requestLeave'), Colors.deepPurple, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LeaveRequestScreen()))),
+              ],
             ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loading ? null : _toggleShift,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _onShift ? Colors.red : Colors.green,
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-              ),
-              child: _loading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : Text(
-                      _onShift ? AppStrings.get('endShift') : AppStrings.get('startShift'),
-                      style: const TextStyle(fontSize: 16, color: Colors.white),
-                    ),
-            ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const MyReportScreen()),
-              ),
-              icon: const Icon(Icons.bar_chart),
-              label: Text(AppStrings.get('myDailyReport')),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const DailyLogScreen()),
-              ),
-              icon: const Icon(Icons.checklist),
-              label: Text(AppStrings.get('dailyLog')),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const LeaveRequestScreen()),
-              ),
-              icon: const Icon(Icons.calendar_month),
-              label: Text(AppStrings.get('requestLeave')),
-            ),
+
             if ((_whatsappNumber?.isNotEmpty ?? false) || (_phoneNumber?.isNotEmpty ?? false)) ...[
               const SizedBox(height: 24),
-              const Divider(),
-              const SizedBox(height: 8),
-              const Text('تواصل مباشر مع الإدارة', style: TextStyle(color: Colors.grey, fontSize: 13)),
+              Center(child: Text('تواصل مباشر مع الإدارة', style: TextStyle(color: Colors.grey.shade600, fontSize: 13))),
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -424,6 +457,55 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ],
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _statCard(String emoji, String value, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 20)),
+          const SizedBox(height: 6),
+          Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
+          Text(label, style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+        ],
+      ),
+    );
+  }
+
+  Widget _featureCard(String emoji, String label, Color color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.15)),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 3))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
+              child: Text(emoji, style: const TextStyle(fontSize: 22)),
+            ),
+            const SizedBox(height: 10),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), maxLines: 2),
           ],
         ),
       ),
