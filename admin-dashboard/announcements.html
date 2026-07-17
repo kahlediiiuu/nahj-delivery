@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>الأخبار والتعليمات - نهج للتوصيل</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .page-wrap { padding: 20px; max-width: 900px; margin: 0 auto; }
+  .card { background: #fff; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+  .card label { display: block; font-size: 13px; margin: 10px 0 4px; color: #334155; }
+  .card input, .card textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-family: inherit; }
+  .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; color: #fff; background: #0f172a; }
+  .btn-danger { background: #dc2626; }
+  .announcement-item { border-bottom: 1px solid #f1f5f9; padding: 16px 0; }
+  .announcement-item:last-child { border-bottom: none; }
+  .announcement-title { font-weight: bold; font-size: 15px; }
+  .announcement-meta { font-size: 12px; color: #94a3b8; margin: 4px 0 8px; }
+  .announcement-body { font-size: 14px; color: #334155; white-space: pre-wrap; }
+  .announcement-img { max-width: 300px; border-radius: 8px; margin-top: 10px; display: block; }
+  .notes-toggle { font-size: 12px; color: #2563eb; cursor: pointer; margin-top: 10px; display: inline-block; }
+  .note-item { background: #f8fafc; border-radius: 8px; padding: 10px; margin-top: 8px; font-size: 13px; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h2>📢 الأخبار والتعليمات</h2>
+    <div class="topbar-right">
+      <a href="index.html" style="color:#fff;margin-left:16px;">← الخريطة المباشرة</a>
+      <a href="drivers.html" style="color:#fff;margin-left:16px;">👥 إدارة المناديب</a>
+      <button id="logoutBtn">خروج</button>
+    </div>
+  </div>
+
+  <div class="page-wrap">
+    <div class="card">
+      <h3>➕ نشر إعلان/خبر/تعليمة جديدة</h3>
+      <label>العنوان</label>
+      <input type="text" id="titleInput" placeholder="مثال: تعليمات جديدة بخصوص التوصيل">
+      <label>المحتوى</label>
+      <textarea id="bodyInput" rows="4" placeholder="اكتب التفاصيل هنا..."></textarea>
+      <label>صورة مرفقة (اختياري، أقل من 700 كيلوبايت)</label>
+      <input type="file" id="imageInput" accept="image/*">
+      <div style="margin-top:14px;">
+        <button class="btn" id="publishBtn">نشر الآن (سيصل إشعار فوري لكل المناديب)</button>
+      </div>
+      <p id="publishMsg" style="margin-top:10px;"></p>
+    </div>
+
+    <div class="card">
+      <h3>📋 كل الإعلانات المنشورة</h3>
+      <div id="announcementsList">جاري التحميل...</div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/announcements.js"></script>
+</body>
+</html>
