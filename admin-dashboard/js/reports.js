@@ -293,3 +293,58 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
     if (btn.dataset.tab === 'absences') loadAbsences();
   });
 });
+
+const noteTypeLabels = {
+  restaurant_closed: '🔒 المطعم مغلق',
+  customer_no_response: '📵 العميل لا يرد',
+  accident: '🚨 حادث',
+  malfunction: '🔧 عطل',
+  app_issue: '📱 مشكلة بالتطبيق',
+  other: '📝 أخرى',
+};
+
+async function loadDailyNotes() {
+  const type = document.getElementById('noteTypeFilter').value;
+  const params = type ? `?type=${type}` : '';
+  const res = await fetch(`${API_URL}/dailynotes${params}`, { headers: { Authorization: `Bearer ${token}` } });
+  const data = await res.json();
+  if (!data.success) return;
+
+  buildDriversMap();
+  const container = document.getElementById('dailyNotesList');
+  if (data.notes.length === 0) {
+    container.innerHTML = '<p style="color:#94a3b8;">لا توجد ملاحظات</p>';
+    return;
+  }
+
+  container.innerHTML = data.notes
+    .map((n) => {
+      const d = driversMap[n.driverId] || {};
+      const time = new Date(n.createdAt).toLocaleString('ar-SA', {
+        year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
+      });
+      const img = n.attachmentData
+        ? `<img src="data:${n.attachmentType};base64,${n.attachmentData}" style="max-width:200px;border-radius:8px;margin-top:8px;display:block;">`
+        : '';
+      return `
+        <div style="background:#fff;border-radius:10px;padding:14px;margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;">
+            <b>${noteTypeLabels[n.type] || n.type}</b>
+            <span style="font-size:12px;color:#94a3b8;">${time}</span>
+          </div>
+          <div style="font-size:13px;color:#64748b;margin:4px 0;">${d.name || n.driverId} — #${d.driverCode || ''}</div>
+          ${n.note ? `<div style="font-size:14px;">${n.note}</div>` : ''}
+          ${img}
+        </div>`;
+    })
+    .join('');
+}
+
+document.getElementById('loadDailyNotesBtn').addEventListener('click', loadDailyNotes);
+document.getElementById('noteTypeFilter').addEventListener('change', loadDailyNotes);
+
+document.querySelectorAll('.tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.tab === 'dailynotes') loadDailyNotes();
+  });
+});
