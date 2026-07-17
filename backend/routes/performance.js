@@ -4,8 +4,8 @@ const { db } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 
 const gradeInfo = {
-  A: { emoji: '👑', label: 'نخبة متميزة (A)', color: 'green' },
-  B: { emoji: '🥈', label: 'أداء جيد جدًا (B)', color: 'green' },
+  A: { emoji: '👑', label: 'نخبة متميزة (A)', color: 'gold' },
+  B: { emoji: '🥈', label: 'أداء جيد جدًا (B)', color: 'silver' },
   C: { emoji: '🥉', label: 'أداء متوسط (C)', color: 'yellow' },
   D: { emoji: '🔸', label: 'أداء دون المتوسط (D)', color: 'yellow' },
   E: { emoji: '🔻', label: 'ضعيف - يحتاج متابعة (E)', color: 'red' },
@@ -14,9 +14,20 @@ const gradeInfo = {
 
 router.post('/upload', verifyToken, requireAdmin, async (req, res) => {
   try {
-    const { date, records } = req.body;
+    const { date, records, confirmReplace } = req.body;
     if (!date || !Array.isArray(records)) {
       return res.status(400).json({ success: false, message: 'بيانات غير صالحة' });
+    }
+
+    if (!confirmReplace) {
+      const existingSnap = await db.collection('dailyPerformance').where('date', '==', date).limit(1).get();
+      if (!existingSnap.empty) {
+        return res.status(409).json({
+          success: false,
+          duplicate: true,
+          message: `تم رفع تقرير لهذا اليوم (${date}) مسبقًا، هل ترغب في استبداله؟`,
+        });
+      }
     }
 
     const batchWrites = records.map((r) => {
@@ -46,22 +57,24 @@ router.post('/upload', verifyToken, requireAdmin, async (req, res) => {
 
     await Promise.all(batchWrites);
 
-    const notifyWrites = records.map((r) => {
-      if (!r.driverId) return null;
-      const grade = gradeInfo[r.grade];
-      const gradeText = grade ? `${grade.emoji} تصنيفك: ${grade.label}` : '';
-      const text = `📊 تقريرك ليوم ${date} جاهز الآن!\n${gradeText}\n✅ منجزة: ${r.completedOrders || 0}/${r.grossOrders || 0} | ⏱️ في الوقت: ${r.onTimeDeliveryScore || 0}%`;
-      return db.collection('messages').add({
-        driverId: r.driverId,
-        sender: 'admin',
-        text,
-        createdAt: Date.now(),
-        readByAdmin: true,
-        readByDriver: false,
-      });
-    }).filter(Boolean);
+    if (!confirmReplace) {
+      const notifyWrites = records.map((r) => {
+        if (!r.driverId) return null;
+        const grade = gradeInfo[r.grade];
+        const gradeText = grade ? `${grade.emoji} تصنيفك: ${grade.label}` : '';
+        const text = `📊 تقريرك ليوم ${date} جاهز الآن!\n${gradeText}\n✅ منجزة: ${r.completedOrders || 0}/${r.grossOrders || 0} | ⏱️ في الوقت: ${r.onTimeDeliveryScore || 0}%`;
+        return db.collection('messages').add({
+          driverId: r.driverId,
+          sender: 'admin',
+          text,
+          createdAt: Date.now(),
+          readByAdmin: true,
+          readByDriver: false,
+        });
+      }).filter(Boolean);
 
-    await Promise.all(notifyWrites);
+      await Promise.all(notifyWrites);
+    }
 
     const allDriversSnap = await db.collection('drivers').where('status', '==', 'active').get();
     const presentIds = new Set(records.filter((r) => r.driverId).map((r) => r.driverId));
@@ -150,6 +163,102 @@ router.patch('/:driverId/:date', verifyToken, requireAdmin, async (req, res) => 
     }
     await db.collection('dailyPerformance').doc(`${driverId}_${date}`).set(updates, { merge: true });
     res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+router.post('/:driverId/:date/comments', verifyToken, async (req, res) => {
+  try {
+    const { driverId, date } = req.params;
+    if (req.user.role === 'driver' && req.user.driverId !== driverId) {
+      return res.status(403).json({ success: false, message: 'غير مسموح' });
+    }
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, message: 'اكتب تعليقك أولًا' });
+    }
+    const docRef = await db.collection('reportComments').add({
+      driverId,
+      date,
+      sender: req.user.role,
+      text: text.trim(),
+      createdAt: Date.now(),
+      requiresResponse: false,
+      response: null,
+    });
+    res.json({ success: true, id: docRef.id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+router.post('/comments/:commentId/reply', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { text, requiresResponse } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, message: 'اكتب الرد أولًا' });
+    }
+    const commentDoc = await db.collection('reportComments').doc(req.params.commentId).get();
+    if (!commentDoc.exists) return res.status(404).json({ success: false, message: 'التعليق غير موجود' });
+
+    await db.collection('reportComments').doc(req.params.commentId).update({
+      response: text.trim(),
+      respondedAt: Date.now(),
+      requiresResponse: !!requiresResponse,
+    });
+
+    const { sendPushToDriver } = require('../utils/push');
+    await sendPushToDriver(
+      commentDoc.data().driverId,
+      requiresResponse ? '⚠️ رد يتطلب ردك على تقريرك' : '📊 ردّت الإدارة على ملاحظتك',
+      text.trim(),
+      {}
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+router.patch('/comments/:commentId', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { response } = req.body;
+    await db.collection('reportComments').doc(req.params.commentId).update({ response: response || '' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+router.delete('/comments/:commentId', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    await db.collection('reportComments').doc(req.params.commentId).delete();
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+router.get('/:driverId/:date/comments', verifyToken, async (req, res) => {
+  try {
+    const { driverId, date } = req.params;
+    if (req.user.role === 'driver' && req.user.driverId !== driverId) {
+      return res.status(403).json({ success: false, message: 'غير مسموح' });
+    }
+    const snap = await db
+      .collection('reportComments')
+      .where('driverId', '==', driverId)
+      .where('date', '==', date)
+      .orderBy('createdAt', 'asc')
+      .get();
+    res.json({ success: true, comments: snap.docs.map((d) => ({ id: d.id, ...d.data() })) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
