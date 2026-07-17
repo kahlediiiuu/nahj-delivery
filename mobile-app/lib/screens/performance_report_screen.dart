@@ -9,11 +9,17 @@ class PerformanceReportScreen extends StatefulWidget {
   State<PerformanceReportScreen> createState() => _PerformanceReportScreenState();
 }
 
-class _PerformanceReportScreenState extends State<PerformanceReportScreen> {
+class _PerformanceReportScreenState extends State<PerformanceReportScreen> with SingleTickerProviderStateMixin {
   DateTime _selectedDate = DateTime.now().subtract(const Duration(days: 1));
   bool _loading = true;
   Map<String, dynamic>? _data;
   String? _error;
+
+  List<dynamic> _comments = [];
+  final _commentController = TextEditingController();
+  bool _sendingComment = false;
+
+  late AnimationController _shineController;
 
   String get _dateKey =>
       '${_selectedDate.year.toString().padLeft(4, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
@@ -21,7 +27,15 @@ class _PerformanceReportScreenState extends State<PerformanceReportScreen> {
   @override
   void initState() {
     super.initState();
+    _shineController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _shineController.dispose();
+    _commentController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -38,6 +52,37 @@ class _PerformanceReportScreenState extends State<PerformanceReportScreen> {
     } finally {
       setState(() => _loading = false);
     }
+    _loadComments();
+  }
+
+  Future<void> _loadComments() async {
+    try {
+      final result = await ApiService.getReportComments(_dateKey);
+      if (result['success'] == true) {
+        setState(() => _comments = result['comments'] ?? []);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _sendComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _sendingComment = true);
+    try {
+      final result = await ApiService.addReportComment(_dateKey, text);
+      if (result['success'] == true) {
+        _commentController.clear();
+        _loadComments();
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.get('connectionError')), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sendingComment = false);
+    }
   }
 
   void _changeDay(int delta) {
@@ -45,10 +90,27 @@ class _PerformanceReportScreenState extends State<PerformanceReportScreen> {
     _load();
   }
 
-  Color _colorFor(String? colorKey) {
+  List<Color> _gradientFor(String? colorKey) {
     switch (colorKey) {
-      case 'green':
-        return const Color(0xFF16A34A);
+      case 'gold':
+        return [const Color(0xFFD4AF37), const Color(0xFFF9E79F), const Color(0xFFB8860B)];
+      case 'silver':
+        return [const Color(0xFF9CA3AF), const Color(0xFFE5E7EB), const Color(0xFF6B7280)];
+      case 'yellow':
+        return [const Color(0xFFEAB308), const Color(0xFFFDE68A)];
+      case 'red':
+        return [const Color(0xFFDC2626), const Color(0xFFFCA5A5)];
+      default:
+        return [Colors.blueGrey, Colors.blueGrey.shade200];
+    }
+  }
+
+  Color _solidColorFor(String? colorKey) {
+    switch (colorKey) {
+      case 'gold':
+        return const Color(0xFFB8860B);
+      case 'silver':
+        return const Color(0xFF6B7280);
       case 'yellow':
         return const Color(0xFFEAB308);
       case 'red':
@@ -66,8 +128,12 @@ class _PerformanceReportScreenState extends State<PerformanceReportScreen> {
         return Icons.star;
       case 'C':
         return Icons.thumb_up;
-      case 'F':
+      case 'D':
+        return Icons.trending_down;
+      case 'E':
         return Icons.warning_amber_rounded;
+      case 'F':
+        return Icons.error_outline;
       default:
         return Icons.info;
     }
@@ -77,8 +143,9 @@ class _PerformanceReportScreenState extends State<PerformanceReportScreen> {
   Widget build(BuildContext context) {
     final found = _data != null && _data!['found'] == true;
     final hidden = _data != null && _data!['hidden'] == true;
-    final color = found ? _colorFor(_data!['categoryColor']) : Colors.grey;
+    final colorKey = found ? _data!['categoryColor']?.toString() : null;
     final grade = found ? _data!['grade']?.toString() : null;
+    final isPremium = colorKey == 'gold' || colorKey == 'silver';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
@@ -118,31 +185,48 @@ class _PerformanceReportScreenState extends State<PerformanceReportScreen> {
                 ),
               )
             else ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [color.withOpacity(0.9), color.withOpacity(0.6)]),
-                  borderRadius: BorderRadius.circular(22),
-                  boxShadow: [BoxShadow(color: color.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 8))],
-                ),
-                child: Column(
-                  children: [
-                    Icon(_iconFor(grade), size: 52, color: Colors.white),
-                    const SizedBox(height: 10),
-                    Text(
-                      _data!['categoryLabel']?.toString().isNotEmpty == true
-                          ? _data!['categoryLabel']
-                          : AppStrings.get('category'),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+              AnimatedBuilder(
+                animation: _shineController,
+                builder: (context, child) {
+                  final shine = isPremium ? (0.7 + 0.3 * _shineController.value) : 1.0;
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: _gradientFor(colorKey).map((c) => c.withOpacity(shine)).toList(),
+                        begin: Alignment.topRight,
+                        end: Alignment.bottomLeft,
+                      ),
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _solidColorFor(colorKey).withOpacity(isPremium ? 0.5 : 0.3),
+                          blurRadius: isPremium ? 20 : 16,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                      border: isPremium ? Border.all(color: Colors.white.withOpacity(0.6), width: 1.5) : null,
                     ),
-                    if (_data!['city'] != null && _data!['city'].toString().isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text('📍 ${_data!['city']}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                    ],
-                  ],
-                ),
+                    child: Column(
+                      children: [
+                        Icon(_iconFor(grade), size: 56, color: Colors.white, shadows: isPremium ? [const Shadow(blurRadius: 12, color: Colors.white70)] : null),
+                        const SizedBox(height: 10),
+                        Text(
+                          _data!['categoryLabel']?.toString().isNotEmpty == true
+                              ? _data!['categoryLabel']
+                              : AppStrings.get('category'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        if (_data!['city'] != null && _data!['city'].toString().isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text('📍 ${_data!['city']}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                        ],
+                      ],
+                    ),
+                  );
+                },
               ),
 
               const SizedBox(height: 20),
@@ -162,7 +246,7 @@ class _PerformanceReportScreenState extends State<PerformanceReportScreen> {
                               value: (_data!['finalQualityScore'] as num).toDouble().clamp(0, 1),
                               strokeWidth: 7,
                               backgroundColor: Colors.grey.shade200,
-                              color: color,
+                              color: _solidColorFor(colorKey),
                             ),
                             Text('${(((_data!['finalQualityScore'] as num) * 100)).toStringAsFixed(0)}%',
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -210,6 +294,67 @@ class _PerformanceReportScreenState extends State<PerformanceReportScreen> {
                   ),
                 ),
               ],
+
+              const SizedBox(height: 24),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('💬 ملاحظاتك على هذا التقرير', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    const SizedBox(height: 12),
+                    if (_comments.isEmpty)
+                      const Text('لا توجد ملاحظات بعد، يمكنك كتابة تعليق أو استفسار أو شكوى أدناه.', style: TextStyle(color: Colors.grey, fontSize: 13))
+                    else
+                      ..._comments.map((c) => Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(10)),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(c['text'] ?? '', style: const TextStyle(fontSize: 13)),
+                                if (c['response'] != null) ...[
+                                  const Divider(height: 16),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.support_agent, size: 16, color: Colors.blue),
+                                      const SizedBox(width: 6),
+                                      Expanded(child: Text(c['response'], style: const TextStyle(fontSize: 13, color: Colors.blue))),
+                                    ],
+                                  ),
+                                ] else
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 6),
+                                    child: Text('⏳ بانتظار رد الإدارة', style: TextStyle(fontSize: 11, color: Colors.orange)),
+                                  ),
+                              ],
+                            ),
+                          )),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _commentController,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        hintText: 'اكتب تعليقًا، اقتراحًا، استفسارًا، أو شكوى...',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _sendingComment ? null : _sendComment,
+                        child: _sendingComment
+                            ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Text('إرسال للإدارة'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ],
         ),
