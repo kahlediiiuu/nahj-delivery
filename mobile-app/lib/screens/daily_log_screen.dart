@@ -37,8 +37,8 @@ class _DailyLogScreenState extends State<DailyLogScreen> {
       } else {
         setState(() => _error = result['message'] ?? AppStrings.get('connectionError'));
       }
-    } catch (e) {
-      setState(() => _error = 'خطأ: $e');
+    } catch (_) {
+      setState(() => _error = AppStrings.get('connectionError'));
     } finally {
       setState(() => _loading = false);
     }
@@ -61,7 +61,15 @@ class _DailyLogScreenState extends State<DailyLogScreen> {
       ),
     );
     if (confirm == true) {
-      await ApiService.deleteOrder(id);
+      try {
+        await ApiService.deleteOrder(id);
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(AppStrings.get('connectionError')), backgroundColor: Colors.red),
+          );
+        }
+      }
       _load();
     }
   }
@@ -82,7 +90,6 @@ class _DailyLogScreenState extends State<DailyLogScreen> {
       appBar: AppBar(title: Text(AppStrings.get('dailyLog'))),
       body: Column(
         children: [
-          // شريط التنقل بين الأيام
           Container(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
             child: Row(
@@ -94,7 +101,6 @@ class _DailyLogScreenState extends State<DailyLogScreen> {
               ],
             ),
           ),
-          // ملخص اليوم
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -112,7 +118,16 @@ class _DailyLogScreenState extends State<DailyLogScreen> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
-                    ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(_error!, style: const TextStyle(color: Colors.red)),
+                            const SizedBox(height: 10),
+                            TextButton(onPressed: _load, child: const Text('إعادة المحاولة')),
+                          ],
+                        ),
+                      )
                     : _orders.isEmpty
                         ? Center(child: Text(AppStrings.get('noDeliveriesToday'), style: const TextStyle(color: Colors.grey)))
                         : ListView.builder(
@@ -180,19 +195,34 @@ class _AddDeliverySheetState extends State<_AddDeliverySheet> {
   String? _failureReason;
   String? _verificationMethod;
   bool _saving = false;
+  String? _submitError;
 
   final List<String> _reasonKeys = ['reasonCustomerAbsent', 'reasonRefused', 'reasonWrongAddress', 'reasonOther'];
   final List<String> _verifyKeys = ['verifySignature', 'verifyOtp', 'verifyPhoto'];
 
   Future<void> _submit() async {
-    if (!_success && _failureReason == null) return;
-    setState(() => _saving = true);
-    await ApiService.addOrder(
-      status: _success ? 'completed' : 'failed',
-      failureReason: _failureReason,
-      verificationMethod: _verificationMethod,
-    );
-    if (mounted) Navigator.pop(context, true);
+    if (!_success && _failureReason == null) {
+      setState(() => _submitError = 'اختر سبب الفشل أولاً');
+      return;
+    }
+    setState(() { _saving = true; _submitError = null; });
+    try {
+      final result = await ApiService.addOrder(
+        status: _success ? 'completed' : 'failed',
+        failureReason: _failureReason,
+        verificationMethod: _verificationMethod,
+      );
+      if (result['success'] == true) {
+        if (mounted) Navigator.pop(context, true);
+      } else {
+        setState(() => _submitError = result['message'] ?? AppStrings.get('connectionError'));
+      }
+    } catch (_) {
+      // هذا يعالج بالضبط مشكلة "الزر يعلّق عند انقطاع الاتصال" - الآن يظهر خطأ واضح بدل التعليق للأبد
+      setState(() => _submitError = AppStrings.get('connectionError'));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
@@ -249,10 +279,16 @@ class _AddDeliverySheetState extends State<_AddDeliverySheet> {
               )).toList(),
             ),
           ],
+          if (_submitError != null) ...[
+            const SizedBox(height: 12),
+            Text(_submitError!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+          ],
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: _saving ? null : _submit,
-            child: _saving ? const CircularProgressIndicator() : Text(AppStrings.get('save')),
+            child: _saving
+                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : Text(AppStrings.get('save')),
           ),
         ],
       ),
