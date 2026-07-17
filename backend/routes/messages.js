@@ -190,4 +190,41 @@ router.post('/:id/resend', requireAdmin, async (req, res) => {
   }
 });
 
+router.post('/broadcast', requireAdmin, async (req, res) => {
+  try {
+    const { target, texts, driverIds } = req.body;
+    if (!texts || !texts.ar) {
+      return res.status(400).json({ success: false, message: 'يجب كتابة النص العربي على الأقل' });
+    }
+
+    let query = db.collection('drivers').where('status', '==', 'active');
+    const snap = await query.get();
+    let targets = snap.docs;
+
+    if (target === 'byIds' && Array.isArray(driverIds)) {
+      targets = targets.filter((d) => driverIds.includes(d.id));
+    }
+
+    const writes = targets.map(async (doc) => {
+      const driverLang = doc.data().language || 'ar';
+      const text = texts[driverLang] || texts.ar;
+      await db.collection('messages').add({
+        driverId: doc.id,
+        sender: 'admin',
+        text,
+        createdAt: Date.now(),
+        readByAdmin: true,
+        readByDriver: false,
+      });
+      await sendPushToDriver(doc.id, '📢 رسالة من الإدارة', text, {});
+    });
+
+    await Promise.all(writes);
+    res.json({ success: true, count: targets.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
 module.exports = router;
