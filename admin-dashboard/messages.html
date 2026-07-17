@@ -55,10 +55,13 @@
         <select id="motivationalSelect" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;">
           <option value="">— اختر رسالة تحفيزية جاهزة (اختياري) —</option>
         </select>
-        <div style="display:flex;gap:8px;">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="file" id="attachFileInput" accept="image/*,.pdf" style="display:none;">
+          <button id="attachBtn" title="إرفاق ملف" style="padding:10px 14px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;">📎</button>
           <input type="text" id="messageInput" placeholder="اكتب رسالة...">
           <button id="sendBtn">إرسال</button>
         </div>
+        <span id="attachStatus" style="font-size:12px;color:#64748b;"></span>
       </div>
     </div>
   </div>
