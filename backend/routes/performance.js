@@ -256,9 +256,11 @@ router.get('/:driverId/:date/comments', verifyToken, async (req, res) => {
       .collection('reportComments')
       .where('driverId', '==', driverId)
       .where('date', '==', date)
-      .orderBy('createdAt', 'asc')
       .get();
-    res.json({ success: true, comments: snap.docs.map((d) => ({ id: d.id, ...d.data() })) });
+    const comments = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => a.createdAt - b.createdAt);
+    res.json({ success: true, comments });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
