@@ -50,11 +50,10 @@ function makeIcon(color, isFollowed) {
   const ring = isFollowed ? 'box-shadow:0 0 0 5px rgba(37,99,235,.4);' : 'box-shadow:0 0 4px rgba(0,0,0,.4);';
   return L.divIcon({
     className: '',
-    html: `<div style="background:${color};width:18px;height:18px;border-radius:50%;border:3px solid #fff;${ring}"></div>`,
-    iconSize: [18, 18],
+    html: `<div style="background:${color};width:26px;height:26px;border-radius:50%;border:3px solid #fff;${ring};display:flex;align-items:center;justify-content:center;font-size:14px;">🏍️</div>`,
+    iconSize: [26, 26],
   });
 }
-
 async function sendReminderTo(driverId) {
   try {
     const token = sessionStorage.getItem('nahj_admin_token');
