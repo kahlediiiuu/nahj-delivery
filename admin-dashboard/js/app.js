@@ -51,6 +51,7 @@ function renderDriverList(filter = '') {
       const { statusClass, tags } = computeStatus(loc);
 
       if (activeStatFilter && !tags.includes(activeStatFilter)) return;
+      if (window.activeCityFilter && info.city !== window.activeCityFilter) return;
 
       const card = document.createElement('div');
       card.className = `driver-card ${statusClass}`;
@@ -102,7 +103,7 @@ async function sendAlertMessage(driverId, text, silent = false) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ driverId, text: `⚠️ ${text}`, silent }),
     });
-    alert('تم إرسال التنبيه بنجاح، وسيصل للمندوب كإشعار فوري (بمجرد فتحه للتطبيق أو أثناء الدوام)');
+    alert('تم إرسال التنبيه بنجاح، وسيصل للمندوب كإشعار فوري بصوت (بمجرد فتحه للتطبيق أو أثناء الدوام)');
   } catch (_) {
     alert('تعذّر إرسال التنبيه، تحقق من الاتصال');
   }
@@ -356,4 +357,11 @@ document.getElementById('sendBroadcastBtn').addEventListener('click', async () =
   } catch (_) {
     alert('تعذّر الاتصال بالخادم');
   }
+});
+
+window.activeCityFilter = null;
+document.getElementById('cityFilterSelect').addEventListener('change', (e) => {
+  window.activeCityFilter = e.target.value || null;
+  if (window.lastLocationsData) updateMarkers(window.lastLocationsData, window.lastDriversInfo || {});
+  renderDriverList(document.getElementById('searchDriver').value);
 });
