@@ -44,6 +44,10 @@
       <div id="convList"></div>
     </div>
     <div class="chat-area">
+      <div id="chatToolsRow" style="display:none;padding:10px;background:#fff;border-bottom:1px solid #e2e8f0;gap:8px;align-items:center;">
+        <input type="text" id="chatSearchInput" placeholder="🔍 ابحث داخل هذه المحادثة..." style="flex:1;padding:8px;border:1px solid #cbd5e1;border-radius:6px;">
+        <button onclick="window.deleteWholeConversation()" style="padding:8px 14px;background:#dc2626;color:#fff;border:none;border-radius:6px;cursor:pointer;white-space:nowrap;">🗑️ حذف المحادثة كاملة</button>
+      </div>
       <div class="chat-messages" id="chatMessages">
         <div class="empty-state">اختر مندوباً من القائمة لبدء المحادثة</div>
       </div>
