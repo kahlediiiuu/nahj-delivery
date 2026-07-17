@@ -74,11 +74,12 @@ function renderMessages(messages) {
       });
       const isAdmin = m.sender === 'admin';
       let attachmentBlock = '';
-      if (m.attachmentUrl) {
+      if (m.attachmentData) {
+        const dataUrl = `data:${m.attachmentType || 'application/octet-stream'};base64,${m.attachmentData}`;
         if ((m.attachmentType || '').startsWith('image/')) {
-          attachmentBlock = `<img src="${m.attachmentUrl}" style="max-width:220px;border-radius:10px;margin-top:6px;display:block;" onclick="window.open('${m.attachmentUrl}','_blank')">`;
+          attachmentBlock = `<img src="${dataUrl}" style="max-width:220px;border-radius:10px;margin-top:6px;display:block;cursor:pointer;" onclick="window.open('${dataUrl}','_blank')">`;
         } else {
-          attachmentBlock = `<a href="${m.attachmentUrl}" target="_blank" style="display:block;margin-top:6px;color:inherit;text-decoration:underline;">📎 ${m.attachmentName || 'تحميل الملف'}</a>`;
+          attachmentBlock = `<a href="${dataUrl}" download="${m.attachmentName || 'file'}" style="display:block;margin-top:6px;color:inherit;text-decoration:underline;">📎 ${m.attachmentName || 'تحميل الملف'}</a>`;
         }
       }
       const responseBlock = m.response
@@ -151,8 +152,8 @@ document.getElementById('attachFileInput')?.addEventListener('change', async (e)
   const file = e.target.files[0];
   if (!file || !currentDriverId) return;
 
-  if (file.size > 5 * 1024 * 1024) {
-    alert('حجم الملف كبير جدًا، الحد الأقصى 5 ميجابايت');
+  if (file.size > 700 * 1024) {
+    alert('حجم الملف كبير جدًا، الحد الأقصى تقريبًا 700 كيلوبايت (بدون خدمة تخزين مدفوعة)');
     e.target.value = '';
     return;
   }
