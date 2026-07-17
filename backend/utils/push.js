@@ -1,6 +1,6 @@
 const { admin, db } = require('../config/firebase');
 
-async function sendPushToDriver(driverId, title, body, data = {}, silent = false) {
+async function sendPushToDriver(driverId, title, body, data = {}, silent = false, tag = null) {
   try {
     const doc = await db.collection('drivers').doc(driverId).get();
     const fcmToken = doc.data()?.fcmToken;
@@ -15,6 +15,7 @@ async function sendPushToDriver(driverId, title, body, data = {}, silent = false
         notification: {
           sound: silent ? undefined : 'default',
           channelId: silent ? 'nahj_messages_silent_channel' : 'nahj_messages_channel',
+          tag: tag || undefined,
         },
       },
     });
