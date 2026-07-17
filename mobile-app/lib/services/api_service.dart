@@ -36,11 +36,9 @@ class ApiService {
 
   static Future<bool> sendLocation(Map<String, dynamic> payload) async {
     await flushQueue();
-
     try {
       final token = await getToken();
       if (token == null) return false;
-
       final res = await http
           .post(
             Uri.parse('$baseUrl/location/update'),
@@ -51,7 +49,6 @@ class ApiService {
             body: jsonEncode(payload),
           )
           .timeout(const Duration(seconds: 10));
-
       if (res.statusCode == 200) return true;
       await _enqueue(payload);
       return false;
@@ -67,7 +64,6 @@ class ApiService {
     final withTimestamp = Map<String, dynamic>.from(payload);
     withTimestamp['timestamp'] = DateTime.now().millisecondsSinceEpoch;
     list.add(jsonEncode(withTimestamp));
-
     while (list.length > _maxQueueSize) {
       list.removeAt(0);
     }
@@ -78,10 +74,8 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     final list = prefs.getStringList(_queueKey) ?? <String>[];
     if (list.isEmpty) return;
-
     final token = await getToken();
     if (token == null) return;
-
     try {
       final points = list.map((s) => jsonDecode(s)).toList();
       final res = await http
@@ -94,7 +88,6 @@ class ApiService {
             body: jsonEncode({'points': points}),
           )
           .timeout(const Duration(seconds: 15));
-
       if (res.statusCode == 200) {
         await prefs.remove(_queueKey);
       }
@@ -106,6 +99,18 @@ class ApiService {
     return (prefs.getStringList(_queueKey) ?? []).length;
   }
 
+  static Future<void> registerLanguage(String language) async {
+    final token = await getToken();
+    if (token == null) return;
+    try {
+      await http.post(
+        Uri.parse('$baseUrl/auth/driver/language'),
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+        body: jsonEncode({'language': language}),
+      ).timeout(const Duration(seconds: 15));
+    } catch (_) {}
+  }
+
   static Future<void> registerFcmToken(String fcmToken) async {
     final token = await getToken();
     if (token == null) return;
@@ -114,22 +119,6 @@ class ApiService {
         Uri.parse('$baseUrl/auth/driver/fcm-token'),
         headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
         body: jsonEncode({'fcmToken': fcmToken}),
-      ).timeout(const Duration(seconds: 15));
-    } catch (_) {}
-  }
-
-  // الدالة التي تم إضافتها لحل مشكلة بناء التطبيق وتحديث اللغة لدى السيرفر
-  static Future<void> registerLanguage(String languageCode) async {
-    final token = await getToken();
-    if (token == null) return;
-    try {
-      await http.post(
-        Uri.parse('$baseUrl/auth/driver/language'), // المسار الافتراضي لتحديث اللغة
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'language': languageCode}),
       ).timeout(const Duration(seconds: 15));
     } catch (_) {}
   }
