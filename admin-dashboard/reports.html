@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="css/style.css">
 <style>
-  .tabs { display:flex; gap:8px; padding:10px 20px; background:#fff; border-bottom:1px solid #e2e8f0; }
+  .tabs { display:flex; gap:8px; padding:10px 20px; background:#fff; border-bottom:1px solid #e2e8f0; flex-wrap:wrap; }
   .tab-btn { padding:8px 16px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:8px; cursor:pointer; font-size:14px; }
   .tab-btn.active { background:#0f172a; color:#fff; border-color:#0f172a; }
   .tab-panel { display:none; padding:20px; }
@@ -46,6 +46,7 @@
     <div class="tab-btn" data-tab="orders">📦 تقرير التوصيلات اليومي</div>
     <div class="tab-btn" data-tab="leave">🗓️ طلبات الإجازة</div>
     <div class="tab-btn" data-tab="absences">🚫 سجل الغياب</div>
+    <div class="tab-btn" data-tab="dailynotes">📝 ملاحظات المناديب</div>
   </div>
 
   <div class="tab-panel active" id="tab-replay">
@@ -145,6 +146,22 @@
       </thead>
       <tbody id="absencesTableBody"></tbody>
     </table>
+  </div>
+
+  <div class="tab-panel" id="tab-dailynotes">
+    <div class="controls-row">
+      <select id="noteTypeFilter">
+        <option value="">كل الأنواع</option>
+        <option value="restaurant_closed">🔒 المطعم مغلق</option>
+        <option value="customer_no_response">📵 العميل لا يرد</option>
+        <option value="accident">🚨 حادث</option>
+        <option value="malfunction">🔧 عطل</option>
+        <option value="app_issue">📱 مشكلة بالتطبيق</option>
+        <option value="other">📝 أخرى</option>
+      </select>
+      <button id="loadDailyNotesBtn">تحديث</button>
+    </div>
+    <div id="dailyNotesList"></div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
