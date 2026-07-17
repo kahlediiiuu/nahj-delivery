@@ -70,16 +70,20 @@ class _MessagesScreenState extends State<MessagesScreen> {
   Future<void> _pickAndSendFile() async {
     try {
       final picker = ImagePicker();
-      final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 50,
+        maxWidth: 1280,
+      );
       if (picked == null) return;
 
       setState(() => _uploading = true);
       final bytes = await File(picked.path).readAsBytes();
 
-      if (bytes.length > 5 * 1024 * 1024) {
+      if (bytes.length > 700 * 1024) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('حجم الملف كبير جدًا (الحد الأقصى 5 ميجابايت)'), backgroundColor: Colors.red),
+            const SnackBar(content: Text('حجم الصورة كبير جدًا حتى بعد الضغط، جرّب صورة أخرى'), backgroundColor: Colors.red),
           );
         }
         return;
@@ -113,17 +117,22 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   Widget _buildAttachment(Map m) {
-    final url = m['attachmentUrl'];
-    if (url == null) return const SizedBox.shrink();
+    final data = m['attachmentData'];
+    if (data == null) return const SizedBox.shrink();
     final type = m['attachmentType']?.toString() ?? '';
     if (type.startsWith('image/')) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 6),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Image.network(url, width: 180, fit: BoxFit.cover),
-        ),
-      );
+      try {
+        final bytes = base64Decode(data);
+        return Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.memory(bytes, width: 180, fit: BoxFit.cover),
+          ),
+        );
+      } catch (_) {
+        return const SizedBox.shrink();
+      }
     }
     return Padding(
       padding: const EdgeInsets.only(top: 6),
