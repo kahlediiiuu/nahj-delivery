@@ -48,10 +48,12 @@ router.get('/my', async (req, res) => {
     const snap = await db
       .collection('dailyNotes')
       .where('driverId', '==', req.user.driverId)
-      .orderBy('createdAt', 'desc')
-      .limit(50)
       .get();
-    res.json({ success: true, notes: snap.docs.map((d) => ({ id: d.id, ...d.data() })) });
+    const notes = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, 50);
+    res.json({ success: true, notes });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
