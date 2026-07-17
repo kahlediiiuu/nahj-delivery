@@ -1,4 +1,3 @@
-// إدارة خريطة OpenStreetMap عبر Leaflet وعلامات المناديب
 const map = L.map('map').setView([24.7136, 46.6753], 11);
 
 (async function centerOnRealWorkZone() {
@@ -84,8 +83,11 @@ function updateMarkers(locations, driversInfo) {
   const now = Date.now();
   window.lastLocationsData = locations;
   window.lastDriversInfo = driversInfo;
+  const isFirstLoad = Object.keys(markers).length === 0;
 
   for (const [driverId, loc] of Object.entries(locations)) {
+    if (window.activeCityFilter && driversInfo[driverId] && driversInfo[driverId].city !== window.activeCityFilter) continue;
+
     const { color, label } = statusColor(loc);
     const info = driversInfo[driverId] || {};
     const sinceUpdate = now - (loc.timestamp || now);
@@ -103,6 +105,7 @@ function updateMarkers(locations, driversInfo) {
       </button>
       ${isOffline ? `<button onclick="window.sendReminderTo('${driverId}')" style="margin-top:6px;margin-right:4px;padding:4px 8px;border-radius:6px;border:1px solid #dc2626;background:#fff;color:#dc2626;cursor:pointer;">📩 إرسال تذكير</button>` : ''}
       <br><a href="reports.html?driverId=${driverId}&tab=replay" style="color:#16a34a;">متابعة مسار الحركة (سجل سابق)</a>
+      <br><a href="messages.html?driverId=${driverId}" style="color:#7c3aed;">💬 فتح المحادثة وسجل النشاط</a>
     `;
 
     if (markers[driverId]) {
@@ -112,7 +115,8 @@ function updateMarkers(locations, driversInfo) {
     } else {
       markers[driverId] = L.marker([loc.lat, loc.lng], { icon: makeIcon(color, isFollowed) })
         .addTo(map)
-        .bindPopup(popupText);
+        .bindPopup(popupText)
+        .bindTooltip(info.name || driverId, { permanent: true, direction: 'top', offset: [0, -10], className: 'driver-name-label' });
     }
 
     if (isFollowed) {
@@ -121,12 +125,27 @@ function updateMarkers(locations, driversInfo) {
   }
 
   for (const driverId of Object.keys(markers)) {
-    if (!(driverId in locations)) {
+    if (!(driverId in locations) || (window.activeCityFilter && driversInfo[driverId] && driversInfo[driverId].city !== window.activeCityFilter)) {
       map.removeLayer(markers[driverId]);
       delete markers[driverId];
     }
   }
+
+  if (isFirstLoad && Object.keys(markers).length > 1) {
+    const bounds = L.latLngBounds(Object.values(markers).map((m) => m.getLatLng()));
+    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+  }
+
+  toggleNameLabelsVisibility();
 }
+
+function toggleNameLabelsVisibility() {
+  const shouldShow = map.getZoom() >= 13;
+  document.querySelectorAll('.driver-name-label').forEach((el) => {
+    el.style.display = shouldShow ? 'block' : 'none';
+  });
+}
+map.on('zoomend', toggleNameLabelsVisibility);
 
 setInterval(() => {
   if (window.lastLocationsData) {
@@ -191,3 +210,24 @@ refreshControl.onAdd = function () {
   return btn;
 };
 refreshControl.addTo(map);
+
+const fitAllControl = L.control({ position: 'topleft' });
+fitAllControl.onAdd = function () {
+  const btn = L.DomUtil.create('button', 'fit-all-btn');
+  btn.innerHTML = '🔭';
+  btn.title = 'عرض كل المناديب دفعة واحدة';
+  btn.style.cssText = 'width:40px;height:40px;background:#fff;border:2px solid rgba(0,0,0,.2);border-radius:6px;font-size:20px;cursor:pointer;margin-top:6px;';
+  L.DomEvent.disableClickPropagation(btn);
+  btn.onclick = () => {
+    const visibleMarkers = Object.values(markers);
+    if (visibleMarkers.length === 0) return;
+    if (visibleMarkers.length === 1) {
+      map.setView(visibleMarkers[0].getLatLng(), 14);
+    } else {
+      const bounds = L.latLngBounds(visibleMarkers.map((m) => m.getLatLng()));
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  };
+  return btn;
+};
+fitAllControl.addTo(map);
