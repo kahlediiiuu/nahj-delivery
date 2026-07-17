@@ -14,6 +14,8 @@ const performanceRoutes = require('./routes/performance');
 const messagesRoutes = require('./routes/messages');
 const leaveRoutes = require('./routes/leave');
 const attachmentsRoutes = require('./routes/attachments');
+const workHoursRoutes = require('./routes/workhours');
+const dailyNotesRoutes = require('./routes/dailynotes');
 const { initLiveTracking } = require('./sockets/liveTracking');
 
 const app = express();
@@ -35,6 +37,8 @@ app.use('/api/performance', performanceRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/leave', leaveRoutes);
 app.use('/api/attachments', attachmentsRoutes);
+app.use('/api/workhours', workHoursRoutes);
+app.use('/api/dailynotes', dailyNotesRoutes);
 
 initLiveTracking(io);
 
