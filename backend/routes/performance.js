@@ -281,6 +281,7 @@ router.post('/:driverId/:date/comments', verifyToken, async (req, res) => {
     const docRef = await db.collection('reportComments').add({
       driverId,
       date,
+      reportType: 'performance',
       sender: req.user.role,
       text: text.trim(),
       createdAt: Date.now(),
@@ -364,6 +365,56 @@ router.get('/:driverId/:date/comments', verifyToken, async (req, res) => {
       .map((d) => ({ id: d.id, ...d.data() }))
       .sort((a, b) => a.createdAt - b.createdAt);
     res.json({ success: true, comments });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+// المشرف: عرض شامل لكل تعليقات التقارير من كل المناديب (أداء + تشغيل معًا)، لصفحة "ملاحظات التقارير"
+router.get('/comments/all', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const snap = await db.collection('reportComments').get();
+    const comments = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, 300);
+    res.json({ success: true, comments });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+// المشرف: إرسال ملاحظة استباقية لأي مندوب على أي تقرير (بدون انتظار تعليق سابق من المندوب)
+router.post('/:driverId/:date/admin-note', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { driverId, date } = req.params;
+    const { text, reportType, requiresResponse } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, message: 'اكتب نص الملاحظة أولًا' });
+    }
+    const docRef = await db.collection('reportComments').add({
+      driverId,
+      date,
+      reportType: reportType === 'operations' ? 'operations' : 'performance',
+      sender: 'admin',
+      text: text.trim(),
+      createdAt: Date.now(),
+      requiresResponse: !!requiresResponse,
+      response: null,
+    });
+
+    const { sendPushToDriver } = require('../utils/push');
+    const reportLabel = reportType === 'operations' ? 'تقرير التشغيل' : 'تقرير الأداء';
+    await sendPushToDriver(
+      driverId,
+      requiresResponse ? `⚠️ ملاحظة تتطلب ردك على ${reportLabel}` : `📝 ملاحظة جديدة على ${reportLabel}`,
+      text.trim(),
+      {}
+    );
+
+    res.json({ success: true, id: docRef.id });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
