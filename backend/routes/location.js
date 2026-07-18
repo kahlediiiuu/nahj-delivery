@@ -233,10 +233,12 @@ router.get('/shift-log/:driverId', verifyToken, requireAdmin, async (req, res) =
     const snap = await db
       .collection('shiftLogs')
       .where('driverId', '==', req.params.driverId)
-      .orderBy('timestamp', 'desc')
-      .limit(100)
       .get();
-    res.json({ success: true, logs: snap.docs.map((d) => ({ id: d.id, ...d.data() })) });
+    const logs = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 100);
+    res.json({ success: true, logs });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
