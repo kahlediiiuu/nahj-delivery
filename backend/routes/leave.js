@@ -71,11 +71,33 @@ router.get('/', requireAdmin, async (req, res) => {
 // المشرف: قبول أو رفض طلب إجازة
 router.patch('/:id', requireAdmin, async (req, res) => {
   try {
-    const { status } = req.body; // 'approved' | 'rejected'
+    const { status, adminNote } = req.body; // 'approved' | 'rejected'
     if (!['approved', 'rejected'].includes(status)) {
       return res.status(400).json({ success: false, message: 'حالة غير صحيحة' });
     }
-    await db.collection('leaveRequests').doc(req.params.id).update({ status, decidedAt: Date.now() });
+    const doc = await db.collection('leaveRequests').doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).json({ success: false, message: 'الطلب غير موجود' });
+
+    await db.collection('leaveRequests').doc(req.params.id).update({
+      status,
+      decidedAt: Date.now(),
+      adminNote: adminNote || '',
+    });
+
+    // إشعار فوري للمندوب بالقرار (مع الملاحظة إن وُجدت - مثل طلب توثيق سبب الغياب)
+    const { sendPushToDriver } = require('../utils/push');
+    const statusText = status === 'approved' ? '✅ تم قبول طلب إجازتك' : '❌ تم رفض طلب إجازتك';
+    const text = adminNote ? `${statusText}\nملاحظة الإدارة: ${adminNote}` : statusText;
+    await db.collection('messages').add({
+      driverId: doc.data().driverId,
+      sender: 'admin',
+      text,
+      createdAt: Date.now(),
+      readByAdmin: true,
+      readByDriver: false,
+    });
+    await sendPushToDriver(doc.data().driverId, statusText, adminNote || 'راجع تطبيقك للتفاصيل', {});
+
     res.json({ success: true });
   } catch (err) {
     console.error(err);
