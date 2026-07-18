@@ -4,7 +4,7 @@
   "description": "Nahj Delivery Live Tracking - Backend API",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node --max-old-space-size=400 server.js",
     "dev": "nodemon server.js"
   },
   "dependencies": {
