@@ -360,8 +360,8 @@ async function loadDailyNotes() {
       const time = new Date(n.createdAt).toLocaleString('ar-SA', {
         year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
       });
-      const img = n.attachmentData
-        ? `<img src="data:${n.attachmentType};base64,${n.attachmentData}" style="max-width:200px;border-radius:8px;margin-top:8px;display:block;">`
+      const img = n.hasAttachment
+        ? `<div id="img-container-${n.id}"><button onclick="window.loadNoteImage('${n.id}')" style="margin-top:8px;padding:6px 12px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">🖼️ عرض الصورة المرفقة</button></div>`
         : '';
       const responseBlock = n.response
         ? `<div style="margin-top:8px;padding:8px;background:#eef2ff;border-radius:8px;font-size:13px;">💬 ردّك: ${n.response}</div>`
@@ -426,6 +426,22 @@ window.deleteNote = async function (noteId) {
     }
   } catch (_) {
     alert('❌ تعذّر الاتصال بالخادم');
+  }
+};
+
+window.loadNoteImage = async function (noteId) {
+  const container = document.getElementById(`img-container-${noteId}`);
+  container.innerHTML = 'جاري تحميل الصورة...';
+  try {
+    const res = await fetch(`${API_URL}/dailynotes/${noteId}`, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    if (data.success && data.note.attachmentData) {
+      container.innerHTML = `<img src="data:${data.note.attachmentType};base64,${data.note.attachmentData}" style="max-width:200px;border-radius:8px;margin-top:8px;display:block;">`;
+    } else {
+      container.innerHTML = '<span style="color:#dc2626;font-size:12px;">تعذّر تحميل الصورة</span>';
+    }
+  } catch (_) {
+    container.innerHTML = '<span style="color:#dc2626;font-size:12px;">تعذّر الاتصال بالخادم</span>';
   }
 };
 
