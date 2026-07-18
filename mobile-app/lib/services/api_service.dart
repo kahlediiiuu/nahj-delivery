@@ -238,6 +238,16 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  static Future<Map<String, dynamic>> replyToDailyNote(String noteId, String text) async {
+    final token = await getToken();
+    final res = await http.post(
+      Uri.parse('$baseUrl/dailynotes/$noteId/driver-reply'),
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      body: jsonEncode({'text': text}),
+    ).timeout(const Duration(seconds: 30));
+    return jsonDecode(res.body);
+  }
+
   static Future<Map<String, dynamic>> getMyDailyNotes() async {
     final token = await getToken();
     final res = await http.get(
