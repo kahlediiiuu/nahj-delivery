@@ -100,8 +100,6 @@ class _AlarmScreenState extends State<AlarmScreen> {
     }
   }
 
-  /// يجدول إشعارًا محليًا يتكرر كل يوم في نفس الوقت - هذا يعمل بالكامل على الجهاز
-  /// (لا يحتاج إنترنت، ولا اتصالًا بالخادم، ولا علاقة له إطلاقًا بخدمة تتبع الموقع).
   Future<void> _scheduleDailyAlarm(TimeOfDay time) async {
     final now = tz.TZDateTime.now(tz.local);
     var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, time.hour, time.minute);
@@ -125,7 +123,8 @@ class _AlarmScreenState extends State<AlarmScreen> {
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.time, // يتكرر يوميًا بنفس الوقت تلقائيًا
+      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.time,
     );
   }
 
