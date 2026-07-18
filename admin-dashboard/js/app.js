@@ -217,43 +217,8 @@ window.openDriverDetails = function (driverId) {
     <button onclick="window.sendLocationProof('${driverId}', ${loc.lat}, ${loc.lng})" style="width:100%;padding:10px;margin-top:8px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;">
       📍 إرسال موقعه الحالي المسجَّل له كإثبات
     </button>` : ''}
-    <button onclick="window.toggleTodayRoute('${driverId}')" style="width:100%;padding:10px;margin-top:8px;background:${window.routeVisibleFor === driverId ? '#dc2626' : '#16a34a'};color:#fff;border:none;border-radius:6px;cursor:pointer;">
-      ${window.routeVisibleFor === driverId ? '🛣️ إخفاء مسار اليوم' : '🛣️ عرض مسار اليوم على الخريطة'}
-    </button>
   `;
   modal.classList.remove('hidden');
-};
-
-window.routeVisibleFor = null;
-let todayRouteLine = null;
-
-window.toggleTodayRoute = async function (driverId) {
-  if (window.routeVisibleFor === driverId) {
-    if (todayRouteLine) { map.removeLayer(todayRouteLine); todayRouteLine = null; }
-    window.routeVisibleFor = null;
-    window.openDriverDetails(driverId);
-    return;
-  }
-
-  if (todayRouteLine) { map.removeLayer(todayRouteLine); todayRouteLine = null; }
-
-  const today = new Date().toISOString().slice(0, 10);
-  try {
-    const res = await fetch(`${API_URL}/reports/route/${driverId}?date=${today}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json();
-    if (!data.success || data.points.length === 0) {
-      alert('لا يوجد سجل حركة مسجَّل لهذا المندوب اليوم بعد');
-      return;
-    }
-    const latlngs = data.points.map((p) => [p.lat, p.lng]);
-    todayRouteLine = L.polyline(latlngs, { color: '#7c3aed', weight: 4, opacity: 0.8 }).addTo(map);
-    window.routeVisibleFor = driverId;
-    window.openDriverDetails(driverId);
-  } catch (_) {
-    alert('تعذّر تحميل مسار الحركة');
-  }
 };
 
 window.sendLocationProof = async function (driverId, lat, lng) {
@@ -395,35 +360,8 @@ document.getElementById('sendBroadcastBtn').addEventListener('click', async () =
 });
 
 window.activeCityFilter = null;
-
-const cityCoordinates = {
-  'الرياض': [24.7136, 46.6753],
-  'جدة': [21.4858, 39.1925],
-  'الدمام': [26.4207, 50.0888],
-  'مكة': [21.3891, 39.8579],
-  'المدينة': [24.5247, 39.5692],
-  'ينبع': [24.0895, 38.0618],
-};
-
 document.getElementById('cityFilterSelect').addEventListener('change', (e) => {
   window.activeCityFilter = e.target.value || null;
-
-  if (window.activeCityFilter && cityCoordinates[window.activeCityFilter]) {
-    map.setView(cityCoordinates[window.activeCityFilter], 12);
-  }
-
   if (window.lastLocationsData) updateMarkers(window.lastLocationsData, window.lastDriversInfo || {});
   renderDriverList(document.getElementById('searchDriver').value);
-
-  if (!window.activeCityFilter) {
-    setTimeout(() => {
-      const visibleMarkers = Object.values(markers);
-      if (visibleMarkers.length === 1) {
-        map.setView(visibleMarkers[0].getLatLng(), 13);
-      } else if (visibleMarkers.length > 1) {
-        const bounds = L.latLngBounds(visibleMarkers.map((m) => m.getLatLng()));
-        map.fitBounds(bounds, { padding: [50, 50] });
-      }
-    }, 150);
-  }
 });
