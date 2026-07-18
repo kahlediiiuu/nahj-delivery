@@ -260,6 +260,6 @@ document.getElementById('motivationalSelect')?.addEventListener('change', (e) =>
 setInterval(() => {
   loadConversations();
   if (currentDriverId) loadMessages();
-}, 5000);
+}, 20000); // 20 ثانية بدل 5 - يخفّف الحمل على الخادم المجاني دون التأثير على تجربة الاستخدام
 
 loadConversations();
