@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>رفع تقرير التشغيل - نهج للتوصيل</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .page-wrap { padding: 20px; }
+  .upload-box { background:#fff; border:2px dashed #cbd5e1; border-radius:12px; padding:30px; text-align:center; margin-bottom:20px; }
+  table { width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; font-size:13px; }
+  th, td { padding:8px 10px; text-align:right; border-bottom:1px solid #f1f5f9; }
+  th { background:#0f172a; color:#fff; position:sticky; top:0; }
+  select, input[type=text] { padding:5px; border:1px solid #cbd5e1; border-radius:6px; width:100%; box-sizing:border-box; }
+  .btn { padding:10px 20px; border:none; border-radius:8px; cursor:pointer; color:#fff; background:#0f172a; }
+  .btn-success { background:#16a34a; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h2>📈 رفع تقرير التشغيل</h2>
+    <div class="topbar-right">
+      <a href="index.html" style="color:#fff;margin-left:16px;">← الخريطة المباشرة</a>
+      <a href="upload-performance.html" style="color:#fff;margin-left:16px;">📊 تقرير الأداء</a>
+      <button id="logoutBtn">خروج</button>
+    </div>
+  </div>
+
+  <div class="page-wrap">
+    <div class="upload-box">
+      <p>اختر ملف Excel لتقرير التشغيل وساعات العمل اليومي</p>
+      <input type="file" id="fileInput" accept=".xlsx,.xls">
+      <p style="font-size:12px;color:#64748b;margin-top:10px;">
+        المطابقة تتم تلقائيًا عبر عمود Rider Id، بنفس رمز المطابقة المسجَّل لكل مندوب في "إدارة المناديب".
+      </p>
+    </div>
+
+    <div id="previewSection" style="display:none;">
+      <label>تاريخ هذا التقرير: <input type="date" id="reportDate"></label>
+      <p id="matchSummary" style="margin:10px 0;font-weight:bold;color:#0f172a;"></p>
+      <div style="overflow-x:auto;margin:16px 0;">
+        <table>
+          <thead>
+            <tr>
+              <th>Rider Id</th><th>اربطه بالمندوب</th><th>المدينة</th>
+              <th>ساعات العمل</th><th>نسبة الحضور</th><th>نسبة القبول</th><th>الغياب</th>
+            </tr>
+          </thead>
+          <tbody id="previewBody"></tbody>
+        </table>
+      </div>
+      <button class="btn btn-success" id="submitBtn">✅ رفع تقرير التشغيل لكل المناديب</button>
+      <p id="uploadMsg" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/upload-operations.js"></script>
+</body>
+</html>
