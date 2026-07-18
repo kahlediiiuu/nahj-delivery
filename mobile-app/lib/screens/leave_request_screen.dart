@@ -181,7 +181,17 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
             ..._history.map((r) => Card(
                   child: ListTile(
                     title: Text(r['date'] ?? ''),
-                    subtitle: Text(r['note'] ?? ''),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(r['note'] ?? ''),
+                        if (r['adminNote'] != null && r['adminNote'].toString().isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text('📝 ملاحظة الإدارة: ${r['adminNote']}', style: const TextStyle(color: Colors.blue, fontSize: 12)),
+                          ),
+                      ],
+                    ),
                     trailing: Text(
                       _statusLabel(r['status'] ?? 'pending'),
                       style: TextStyle(color: _statusColor(r['status'] ?? 'pending'), fontWeight: FontWeight.bold),
