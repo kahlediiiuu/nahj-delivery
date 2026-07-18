@@ -212,18 +212,118 @@ class _DailyNotesScreenState extends State<DailyNotesScreen> {
               child: Center(child: Text('لا توجد ملاحظات سابقة', style: TextStyle(color: Colors.grey))),
             )
           else
-            ..._history.map((n) {
-              final time = DateTime.fromMillisecondsSinceEpoch(n['createdAt']);
-              final timeStr = '${time.year}-${time.month.toString().padLeft(2, '0')}-${time.day.toString().padLeft(2, '0')} ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-              return Card(
-                child: ListTile(
-                  title: Text(_labelFor(n['type'])),
-                  subtitle: Text(n['note']?.toString().isNotEmpty == true ? n['note'] : timeStr),
-                  trailing: n['attachmentData'] != null ? const Icon(Icons.image, color: Colors.blue) : null,
-                ),
-              );
-            }),
+            ..._history.map((n) => _NoteHistoryCard(note: n, labelFor: _labelFor)),
         ],
+      ),
+    );
+  }
+}
+
+class _NoteHistoryCard extends StatefulWidget {
+  final Map note;
+  final String Function(String) labelFor;
+  const _NoteHistoryCard({required this.note, required this.labelFor});
+
+  @override
+  State<_NoteHistoryCard> createState() => _NoteHistoryCardState();
+}
+
+class _NoteHistoryCardState extends State<_NoteHistoryCard> {
+  bool _showReplyBox = false;
+  final _replyController = TextEditingController();
+  bool _sending = false;
+  String? _driverReply;
+
+  @override
+  void initState() {
+    super.initState();
+    _driverReply = widget.note['driverReply'];
+  }
+
+  @override
+  void dispose() {
+    _replyController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendReply() async {
+    final text = _replyController.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _sending = true);
+    try {
+      final result = await ApiService.replyToDailyNote(widget.note['id'], text);
+      if (result['success'] == true) {
+        setState(() {
+          _driverReply = text;
+          _showReplyBox = false;
+        });
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final n = widget.note;
+    final time = DateTime.fromMillisecondsSinceEpoch(n['createdAt']);
+    final timeStr = '${time.year}-${time.month.toString().padLeft(2, '0')}-${time.day.toString().padLeft(2, '0')} ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(widget.labelFor(n['type']), style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                if (n['attachmentData'] != null) const Icon(Icons.image, color: Colors.blue, size: 18),
+              ],
+            ),
+            Text(n['note']?.toString().isNotEmpty == true ? n['note'] : timeStr, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            if (n['response'] != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(8)),
+                child: Row(
+                  children: [
+                    const Icon(Icons.support_agent, size: 16, color: Colors.indigo),
+                    const SizedBox(width: 6),
+                    Expanded(child: Text('رد الإدارة: ${n['response']}', style: const TextStyle(fontSize: 13))),
+                  ],
+                ),
+              ),
+              if (_driverReply != null) ...[
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(8)),
+                  child: Text('ردّك: $_driverReply', style: const TextStyle(fontSize: 13)),
+                ),
+              ] else if (_showReplyBox) ...[
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _replyController,
+                  decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'اكتب ردك هنا...', isDense: true),
+                ),
+                const SizedBox(height: 6),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _sending ? null : _sendReply,
+                    child: _sending ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('إرسال ردي'),
+                  ),
+                ),
+              ] else
+                TextButton(onPressed: () => setState(() => _showReplyBox = true), child: const Text('الرد على الإدارة')),
+            ],
+          ],
+        ),
       ),
     );
   }
