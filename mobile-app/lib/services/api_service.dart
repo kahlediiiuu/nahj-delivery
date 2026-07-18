@@ -374,6 +374,15 @@ class ApiService {
     return res.statusCode == 200;
   }
 
+  static Future<Map<String, dynamic>> getMyOperationsReport({String? date}) async {
+    final token = await getToken();
+    final uri = date != null
+        ? Uri.parse('$baseUrl/operations/my?date=$date')
+        : Uri.parse('$baseUrl/operations/my');
+    final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'}).timeout(const Duration(seconds: 60));
+    return jsonDecode(res.body);
+  }
+
   static Future<Map<String, dynamic>> getMyPerformance({String? date}) async {
     final token = await getToken();
     final uri = date != null
