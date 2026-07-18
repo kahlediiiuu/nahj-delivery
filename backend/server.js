@@ -19,6 +19,7 @@ const dailyNotesRoutes = require('./routes/dailynotes');
 const announcementsRoutes = require('./routes/announcements');
 const operationsRoutes = require('./routes/operations');
 const payrollRoutes = require('./routes/payroll');
+const notificationsRoutes = require('./routes/notifications');
 const { initLiveTracking } = require('./sockets/liveTracking');
 
 const app = express();
@@ -45,6 +46,7 @@ app.use('/api/dailynotes', dailyNotesRoutes);
 app.use('/api/announcements', announcementsRoutes);
 app.use('/api/operations', operationsRoutes);
 app.use('/api/payroll', payrollRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 // بث المواقع اللحظية إلى لوحة التحكم عبر WebSocket
 initLiveTracking(io);
