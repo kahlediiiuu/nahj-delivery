@@ -383,6 +383,27 @@ class ApiService {
     return res.statusCode == 200;
   }
 
+  static Future<Map<String, dynamic>> getOperationsComments(String date) async {
+    final token = await getToken();
+    final driverId = await _getDriverIdFromToken();
+    final res = await http.get(
+      Uri.parse('$baseUrl/operations/$driverId/$date/comments'),
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 30));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> addOperationsComment(String date, String text) async {
+    final token = await getToken();
+    final driverId = await _getDriverIdFromToken();
+    final res = await http.post(
+      Uri.parse('$baseUrl/operations/$driverId/$date/comments'),
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      body: jsonEncode({'text': text}),
+    ).timeout(const Duration(seconds: 30));
+    return jsonDecode(res.body);
+  }
+
   static Future<Map<String, dynamic>> getMyOperationsReport({String? date}) async {
     final token = await getToken();
     final uri = date != null
