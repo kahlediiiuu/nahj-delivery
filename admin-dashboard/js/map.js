@@ -54,17 +54,23 @@ function makeIcon(color, isFollowed) {
     iconSize: [26, 26],
   });
 }
+
 async function sendReminderTo(driverId) {
   try {
     const token = sessionStorage.getItem('nahj_admin_token');
-    await fetch(`${window.NAHJ_API_URL}/messages`, {
+    const res = await fetch(`${NAHJ_API_URL}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ driverId, text: '⚠️ تنبيه من الإدارة: الرجاء التأكد من فتح التطبيق وبدء الدوام وتفعيل الموقع.' }),
     });
-    alert('تم إرسال التذكير بنجاح، سيصل للمندوب فور فتحه للتطبيق');
+    const data = await res.json();
+    if (data.success) {
+      alert('✅ تم إرسال التذكير بنجاح، سيصل للمندوب فور فتحه للتطبيق');
+    } else {
+      alert('❌ فشل إرسال التذكير: ' + (data.message || 'خطأ غير معروف'));
+    }
   } catch (_) {
-    alert('تعذّر إرسال التذكير، تحقق من الاتصال');
+    alert('❌ تعذّر إرسال التذكير، تحقق من الاتصال');
   }
 }
 
@@ -115,7 +121,7 @@ function updateMarkers(locations, driversInfo) {
       markers[driverId] = L.marker([loc.lat, loc.lng], { icon: makeIcon(color, isFollowed) })
         .addTo(map)
         .bindPopup(popupText)
-        .bindTooltip(info.name || driverId, { permanent: true, direction: 'top', offset: [0, -10], className: 'driver-name-label' });
+        .bindTooltip(info.name || driverId, { permanent: true, direction: 'top', offset: [0, -18], className: 'driver-name-label' });
     }
 
     if (isFollowed) {
