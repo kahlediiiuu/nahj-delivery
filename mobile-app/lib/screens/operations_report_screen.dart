@@ -13,6 +13,9 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
   bool _loading = true;
   Map<String, dynamic>? _data;
   String? _error;
+  List<dynamic> _comments = [];
+  final _commentController = TextEditingController();
+  bool _sendingComment = false;
 
   String get _dateKey =>
       '${_selectedDate.year.toString().padLeft(4, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
@@ -21,6 +24,12 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -36,6 +45,41 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
       setState(() => _error = 'خطأ: $e');
     } finally {
       setState(() => _loading = false);
+    }
+    _loadComments();
+  }
+
+  Future<void> _loadComments() async {
+    try {
+      final result = await ApiService.getOperationsComments(_dateKey);
+      if (result['success'] == true) {
+        setState(() => _comments = result['comments'] ?? []);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _sendComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _sendingComment = true);
+    try {
+      final result = await ApiService.addOperationsComment(_dateKey, text);
+      if (result['success'] == true) {
+        _commentController.clear();
+        _loadComments();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ ${result['message'] ?? 'فشل الإرسال'}'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('❌ تعذّر الاتصال بالخادم'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sendingComment = false);
     }
   }
 
@@ -157,6 +201,67 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
                   ),
                 ),
               ],
+
+              const SizedBox(height: 24),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('💬 ملاحظاتك على تقرير التشغيل', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    const SizedBox(height: 12),
+                    if (_comments.isEmpty)
+                      const Text('لا توجد ملاحظات بعد.', style: TextStyle(color: Colors.grey, fontSize: 13))
+                    else
+                      ..._comments.map((c) => Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(10)),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(c['text'] ?? '', style: const TextStyle(fontSize: 13)),
+                                if (c['response'] != null) ...[
+                                  const Divider(height: 16),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.support_agent, size: 16, color: Colors.blue),
+                                      const SizedBox(width: 6),
+                                      Expanded(child: Text(c['response'], style: const TextStyle(fontSize: 13, color: Colors.blue))),
+                                    ],
+                                  ),
+                                ] else if (c['sender'] == 'driver')
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 6),
+                                    child: Text('⏳ بانتظار رد الإدارة', style: TextStyle(fontSize: 11, color: Colors.orange)),
+                                  ),
+                              ],
+                            ),
+                          )),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _commentController,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        hintText: 'اكتب تعليقًا أو استفسارًا عن تقرير التشغيل...',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _sendingComment ? null : _sendComment,
+                        child: _sendingComment
+                            ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Text('إرسال للإدارة'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ],
         ),
