@@ -10,6 +10,11 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
   window.location.href = 'login.html';
 });
 
+function cityNormalize(str) {
+  if (!str) return '';
+  return str.normalize('NFC').trim();
+}
+
 let driversInfo = {}; // driverId -> {name, phone, driverCode, ...}
 let latestLocations = {};
 
@@ -51,7 +56,7 @@ function renderDriverList(filter = '') {
       const { statusClass, tags } = computeStatus(loc);
 
       if (activeStatFilter && !tags.includes(activeStatFilter)) return;
-      if (window.activeCityFilter && info.city !== window.activeCityFilter) return;
+      if (window.activeCityFilter && cityNormalize(info.city) !== cityNormalize(window.activeCityFilter)) return;
 
       const card = document.createElement('div');
       card.className = `driver-card ${statusClass}`;
@@ -433,6 +438,22 @@ document.getElementById('cityFilterSelect').addEventListener('change', (e) => {
 
   if (window.lastLocationsData) updateMarkers(window.lastLocationsData, window.lastDriversInfo || {});
   renderDriverList(document.getElementById('searchDriver').value);
+
+  if (window.activeCityFilter) {
+    const matchCount = Object.values(driversInfo).filter(
+      (info) => cityNormalize(info.city) === cityNormalize(window.activeCityFilter)
+    ).length;
+    let counter = document.getElementById('cityMatchCounter');
+    if (!counter) {
+      counter = document.createElement('span');
+      counter.id = 'cityMatchCounter';
+      counter.style.cssText = 'padding:6px 12px;background:#0f172a;color:#fff;border-radius:8px;font-size:13px;';
+      document.getElementById('cityFilterSelect').insertAdjacentElement('afterend', counter);
+    }
+    counter.textContent = matchCount > 0 ? `✅ ${matchCount} مندوب في ${window.activeCityFilter}` : `⚠️ لا يوجد أي مندوب مسجَّل بمدينة "${window.activeCityFilter}" في إدارة المناديب`;
+  } else {
+    document.getElementById('cityMatchCounter')?.remove();
+  }
 
   if (!window.activeCityFilter) {
     // عند اختيار "كل المدن": وسّع الخريطة لتشمل فقط المناديب الظاهرين فعليًا الآن (وليس كل المدن نظريًا)
