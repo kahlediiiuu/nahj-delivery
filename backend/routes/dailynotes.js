@@ -67,9 +67,27 @@ router.get('/', requireAdmin, async (req, res) => {
   try {
     let query = db.collection('dailyNotes').orderBy('createdAt', 'desc').limit(200);
     const snap = await query.get();
-    let notes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    let notes = snap.docs.map((d) => {
+      const data = d.data();
+      // ⚠️ لا نُرسل الصورة الكاملة (base64) ضمن القائمة الإجمالية أبدًا - قد تكون كل صورة حتى 700 كيلوبايت،
+      // و200 ملاحظة × 700KB = خطر حقيقي على ذاكرة الخادم المجانية. نكتفي بعلامة "توجد صورة" فقط هنا.
+      const { attachmentData, ...rest } = data;
+      return { id: d.id, ...rest, hasAttachment: !!attachmentData };
+    });
     if (req.query.type) notes = notes.filter((n) => n.type === req.query.type);
     res.json({ success: true, notes });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+// المشرف: جلب ملاحظة واحدة كاملة مع صورتها (فقط عند الحاجة الفعلية لعرضها)
+router.get('/:id', requireAdmin, async (req, res) => {
+  try {
+    const doc = await db.collection('dailyNotes').doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).json({ success: false, message: 'الملاحظة غير موجودة' });
+    res.json({ success: true, note: { id: doc.id, ...doc.data() } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
