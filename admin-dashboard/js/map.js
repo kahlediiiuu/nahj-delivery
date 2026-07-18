@@ -92,20 +92,40 @@ function updateMarkers(locations, driversInfo) {
   window.lastDriversInfo = driversInfo;
   const isFirstLoad = Object.keys(markers).length === 0;
 
-  for (const [driverId, loc] of Object.entries(locations)) {
-    if (window.activeCityFilter && driversInfo[driverId] && driversInfo[driverId].city !== window.activeCityFilter) continue;
+  // نبني قائمة موحّدة: كل مندوب له موقع حي أو آخر موقع معروف محفوظ، حتى يظهر دائمًا على الخريطة
+  const allDriverIds = new Set([...Object.keys(locations), ...Object.keys(driversInfo)]);
 
-    const { color, label } = statusColor(loc);
+  for (const driverId of allDriverIds) {
     const info = driversInfo[driverId] || {};
+    if (window.activeCityFilter && info.city !== window.activeCityFilter) continue;
+
+    let loc = locations[driverId];
+    let isStale = false;
+    if (!loc) {
+      if (info.lastKnownLocation && info.lastKnownLocation.lat) {
+        loc = {
+          lat: info.lastKnownLocation.lat,
+          lng: info.lastKnownLocation.lng,
+          timestamp: info.lastSeen || 0,
+          gpsEnabled: true,
+          insideWorkZone: true,
+          status: 'stopped',
+        };
+        isStale = true;
+      } else {
+        continue;
+      }
+    }
+
+    const { color, label } = isStale ? { color: '#9ca3af', label: 'غير متصل (آخر موقع معروف)' } : statusColor(loc);
     const sinceUpdate = now - (loc.timestamp || now);
-    const isOffline = sinceUpdate > 60000;
+    const isOffline = isStale || sinceUpdate > 60000;
     const isFollowed = window.followedDriverId === driverId;
 
     const popupText = `
       <b>${info.name || driverId}</b><br>
       <span style="color:${color}">${label}</span><br>
-      السرعة: ${(loc.speed || 0).toFixed(1)} كم/س<br>
-      البطارية: ${loc.battery ?? '--'}%<br>
+      ${!isStale ? `السرعة: ${(loc.speed || 0).toFixed(1)} كم/س<br>البطارية: ${loc.battery ?? '--'}%<br>` : ''}
       ${isOffline ? `<span style="color:#dc2626">آخر تحديث: ${formatDuration(sinceUpdate)}</span>` : 'آخر تحديث: الآن'}<br>
       <button onclick="window.toggleFollow('${driverId}')" style="margin-top:6px;padding:4px 8px;border-radius:6px;border:1px solid #2563eb;background:${isFollowed ? '#2563eb' : '#fff'};color:${isFollowed ? '#fff' : '#2563eb'};cursor:pointer;">
         ${isFollowed ? '⏹ إيقاف المتابعة المباشرة' : '▶ متابعة مباشرة'}
@@ -120,7 +140,7 @@ function updateMarkers(locations, driversInfo) {
       markers[driverId].setIcon(makeIcon(color, isFollowed));
       markers[driverId].setPopupContent(popupText);
     } else {
-      markers[driverId] = L.marker([loc.lat, loc.lng], { icon: makeIcon(color, isFollowed) })
+      markers[driverId] = L.marker([loc.lat, loc.lng], { icon: makeIcon(color, isFollowed), opacity: isStale ? 0.55 : 1 })
         .addTo(map)
         .bindPopup(popupText)
         .bindTooltip(info.name || driverId, { permanent: true, direction: 'top', offset: [0, -18], className: 'driver-name-label' });
@@ -132,13 +152,14 @@ function updateMarkers(locations, driversInfo) {
   }
 
   for (const driverId of Object.keys(markers)) {
-    if (!(driverId in locations) || (window.activeCityFilter && driversInfo[driverId] && driversInfo[driverId].city !== window.activeCityFilter)) {
+    const info = driversInfo[driverId] || {};
+    const stillValid = allDriverIds.has(driverId) && (!window.activeCityFilter || info.city === window.activeCityFilter);
+    if (!stillValid) {
       map.removeLayer(markers[driverId]);
       delete markers[driverId];
     }
   }
 
-  // عند أول تحميل فقط: وسّع الخريطة تلقائيًا لتشمل كل المناديب مهما تباعدوا (بدون إزعاج التنقل اليدوي لاحقًا)
   if (isFirstLoad && Object.keys(markers).length > 1) {
     const bounds = L.latLngBounds(Object.values(markers).map((m) => m.getLatLng()));
     map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
