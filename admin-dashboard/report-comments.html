@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ملاحظات التقارير - نهج للتوصيل</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .page-wrap { padding: 20px; max-width: 1000px; margin: 0 auto; }
+  .card { background: #fff; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+  .card label { display: block; font-size: 13px; margin: 10px 0 4px; color: #334155; }
+  .card input, .card textarea, .card select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-family: inherit; }
+  .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; color: #fff; background: #0f172a; }
+  .controls-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+  .comment-item { border-bottom: 1px solid #f1f5f9; padding: 14px 0; }
+  .comment-item:last-child { border-bottom: none; }
+  .comment-meta { font-size: 12px; color: #94a3b8; margin-bottom: 6px; }
+  .comment-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; margin-left:6px; }
+  .badge-performance { background:#eef2ff; color:#4338ca; }
+  .badge-operations { background:#ecfeff; color:#0e7490; }
+  .badge-driver { background:#f1f5f9; color:#334155; }
+  .badge-admin { background:#0f172a; color:#fff; }
+  .comment-text { font-size: 14px; margin-bottom: 8px; }
+  .response-box { background:#f8fafc; border-radius:8px; padding:10px; font-size:13px; margin-top:6px; }
+  .reply-row { display:flex; gap:8px; margin-top:8px; }
+  .reply-row input { flex:1; }
+  .pending-tag { color:#eab308; font-size:11px; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h2>💬 ملاحظات التقارير</h2>
+    <div class="topbar-right">
+      <a href="index.html" style="color:#fff;margin-left:16px;">← الخريطة المباشرة</a>
+      <a href="reports.html" style="color:#fff;margin-left:16px;">📊 التقارير</a>
+      <button id="logoutBtn">خروج</button>
+    </div>
+  </div>
+
+  <div class="page-wrap">
+    <div class="card">
+      <h3>✉️ إرسال ملاحظة استباقية لأي مندوب على أي تقرير</h3>
+      <label>اختر المندوب</label>
+      <select id="noteDriverSelect"><option>جاري التحميل...</option></select>
+      <label>نوع التقرير</label>
+      <select id="noteReportType">
+        <option value="performance">📊 تقرير الأداء</option>
+        <option value="operations">📈 تقرير التشغيل</option>
+      </select>
+      <label>تاريخ التقرير المقصود</label>
+      <input type="date" id="noteDate">
+      <label>نص الملاحظة</label>
+      <textarea id="noteText" rows="3" placeholder="مثال: يرجى توضيح سبب التأخر في طلب رقم..."></textarea>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:10px;">
+        <input type="checkbox" id="noteRequiresResponse" style="width:auto;">
+        <span>يتطلب ردًا إلزاميًا من المندوب</span>
+      </label>
+      <button class="btn" id="sendNoteBtn" style="margin-top:14px;">إرسال الملاحظة الآن</button>
+      <p id="sendNoteMsg" style="margin-top:10px;"></p>
+    </div>
+
+    <div class="card">
+      <div class="controls-row">
+        <h3 style="margin:0;">📋 كل الملاحظات</h3>
+        <select id="filterReportType" style="width:auto;">
+          <option value="">كل الأنواع</option>
+          <option value="performance">📊 تقرير الأداء فقط</option>
+          <option value="operations">📈 تقرير التشغيل فقط</option>
+        </select>
+        <select id="filterPending" style="width:auto;">
+          <option value="">الكل</option>
+          <option value="pending">بانتظار الرد فقط</option>
+        </select>
+        <button class="btn" id="refreshCommentsBtn">تحديث</button>
+      </div>
+      <div id="commentsList">جاري التحميل...</div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/report-comments.js"></script>
+</body>
+</html>
