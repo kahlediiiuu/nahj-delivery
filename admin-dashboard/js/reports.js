@@ -77,36 +77,50 @@ document.getElementById('loadRouteBtn').addEventListener('click', async () => {
   const date = document.getElementById('replayDate').value;
   if (!driverId || !date) return alert('اختر المندوب والتاريخ');
 
-  const res = await fetch(`${API_URL}/reports/route/${driverId}?date=${date}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const data = await res.json();
+  document.getElementById('replayInfo').textContent = 'جاري تحميل المسار...';
 
-  if (!data.success || data.points.length === 0) {
-    document.getElementById('replayInfo').textContent = 'لا يوجد سجل حركة لهذا اليوم';
-    return;
+  try {
+    const res = await fetch(`${API_URL}/reports/route/${driverId}?date=${date}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) {
+      document.getElementById('replayInfo').textContent = `❌ فشل الطلب (رمز الخطأ ${res.status}) - قد تكون الجلسة منتهية، أعد تسجيل الدخول`;
+      return;
+    }
+
+    const data = await res.json();
+
+    if (!data.success || !data.points || data.points.length === 0) {
+      document.getElementById('replayInfo').textContent = '⚠️ لا يوجد سجل حركة مسجَّل لهذا المندوب في هذا التاريخ (يعني أنه لم يكن في وضع "تسجيل الحضور" ذلك اليوم إطلاقًا)';
+      document.getElementById('playBtn').disabled = true;
+      document.getElementById('pauseBtn').disabled = true;
+      return;
+    }
+
+      routePoints = data.points;
+    document.getElementById('replayInfo').textContent = `✅ تم التحميل - عدد النقاط: ${routePoints.length}`;
+
+    if (routeLine) replayMap.removeLayer(routeLine);
+    if (routeMarker) replayMap.removeLayer(routeMarker);
+
+    const latlngs = routePoints.map((p) => [p.lat, p.lng]);
+    routeLine = L.polyline(latlngs, { color: '#2563eb', weight: 4 }).addTo(replayMap);
+    replayMap.fitBounds(routeLine.getBounds());
+
+    routeMarker = L.marker(latlngs[0], {
+      icon: L.divIcon({ html: '<div style="background:#dc2626;width:16px;height:16px;border-radius:50%;border:3px solid #fff"></div>', className: '' }),
+    }).addTo(replayMap);
+
+    const slider = document.getElementById('replaySlider');
+    slider.max = routePoints.length - 1;
+    slider.value = 0;
+
+    document.getElementById('playBtn').disabled = false;
+    document.getElementById('pauseBtn').disabled = false;
+  } catch (err) {
+    document.getElementById('replayInfo').textContent = '❌ تعذّر الاتصال بالخادم، تحقق من الإنترنت وحاول مجددًا';
   }
-
-  routePoints = data.points;
-  document.getElementById('replayInfo').textContent = `عدد النقاط: ${routePoints.length}`;
-
-  if (routeLine) replayMap.removeLayer(routeLine);
-  if (routeMarker) replayMap.removeLayer(routeMarker);
-
-  const latlngs = routePoints.map((p) => [p.lat, p.lng]);
-  routeLine = L.polyline(latlngs, { color: '#2563eb', weight: 4 }).addTo(replayMap);
-  replayMap.fitBounds(routeLine.getBounds());
-
-  routeMarker = L.marker(latlngs[0], {
-    icon: L.divIcon({ html: '<div style="background:#dc2626;width:16px;height:16px;border-radius:50%;border:3px solid #fff"></div>', className: '' }),
-  }).addTo(replayMap);
-
-  const slider = document.getElementById('replaySlider');
-  slider.max = routePoints.length - 1;
-  slider.value = 0;
-
-  document.getElementById('playBtn').disabled = false;
-  document.getElementById('pauseBtn').disabled = false;
 });
 
 function moveToIndex(i) {
