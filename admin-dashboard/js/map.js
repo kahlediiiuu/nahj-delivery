@@ -1,4 +1,10 @@
 // إدارة خريطة OpenStreetMap عبر Leaflet وعلامات المناديب
+// تنظيف نص المدينة من أي مسافات زائدة أو اختلاف تنسيق Unicode غير مرئي قبل المقارنة
+function cityNormalize(str) {
+  if (!str) return '';
+  return str.normalize('NFC').trim();
+}
+
 const map = L.map('map').setView([24.7136, 46.6753], 11);
 
 (async function centerOnRealWorkZone() {
@@ -97,7 +103,7 @@ function updateMarkers(locations, driversInfo) {
 
   for (const driverId of allDriverIds) {
     const info = driversInfo[driverId] || {};
-    if (window.activeCityFilter && info.city !== window.activeCityFilter) continue;
+    if (window.activeCityFilter && cityNormalize(info.city) !== cityNormalize(window.activeCityFilter)) continue;
 
     let loc = locations[driverId];
     let isStale = false;
@@ -153,7 +159,7 @@ function updateMarkers(locations, driversInfo) {
 
   for (const driverId of Object.keys(markers)) {
     const info = driversInfo[driverId] || {};
-    const stillValid = allDriverIds.has(driverId) && (!window.activeCityFilter || info.city === window.activeCityFilter);
+    const stillValid = allDriverIds.has(driverId) && (!window.activeCityFilter || cityNormalize(info.city) === cityNormalize(window.activeCityFilter));
     if (!stillValid) {
       map.removeLayer(markers[driverId]);
       delete markers[driverId];
