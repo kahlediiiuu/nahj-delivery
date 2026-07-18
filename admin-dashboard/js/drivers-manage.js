@@ -149,44 +149,76 @@ document.getElementById('saveDriverBtn').addEventListener('click', async () => {
   }
 });
 
+async function checkResponse(res) {
+  try {
+    const data = await res.json();
+    if (res.ok && data.success) return true;
+    alert('❌ فشلت العملية: ' + (data.message || `رمز الخطأ ${res.status}`));
+    return false;
+  } catch (_) {
+    alert('❌ تعذّر فهم رد الخادم، حاول مجددًا');
+    return false;
+  }
+}
+
 window.suspendDriver = async function (id) {
   const reason = prompt('سبب الإيقاف (اختياري، سيظهر للمندوب إن حاول الدخول):', '');
   if (reason === null) return;
-  await fetch(`${API_URL}/drivers/${id}/suspend`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ reason }),
-  });
-  loadDrivers();
+  try {
+    const res = await fetch(`${API_URL}/drivers/${id}/suspend`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ reason }),
+    });
+    if (await checkResponse(res)) loadDrivers();
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم');
+  }
 };
 
 window.activateDriver = async function (id) {
-  await fetch(`${API_URL}/drivers/${id}/activate`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } });
-  loadDrivers();
+  try {
+    const res = await fetch(`${API_URL}/drivers/${id}/activate`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } });
+    if (await checkResponse(res)) loadDrivers();
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم');
+  }
 };
 
 window.toggleLogin = async function (id, disableLogin) {
-  await fetch(`${API_URL}/drivers/${id}/toggle-login`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ disableLogin }),
-  });
-  loadDrivers();
+  try {
+    const res = await fetch(`${API_URL}/drivers/${id}/toggle-login`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ disableLogin }),
+    });
+    if (await checkResponse(res)) loadDrivers();
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم');
+  }
 };
 
 window.toggleReports = async function (id, hideReports) {
-  await fetch(`${API_URL}/drivers/${id}/toggle-reports`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ hideReports }),
-  });
-  loadDrivers();
+  try {
+    const res = await fetch(`${API_URL}/drivers/${id}/toggle-reports`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ hideReports }),
+    });
+    if (await checkResponse(res)) loadDrivers();
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم');
+  }
 };
 
 window.deleteDriver = async function (id, name) {
   if (!confirm(`هل أنت متأكد من حذف "${name}" نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
-  await fetch(`${API_URL}/drivers/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-  loadDrivers();
+  try {
+    const res = await fetch(`${API_URL}/drivers/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    if (await checkResponse(res)) loadDrivers();
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم');
+  }
 };
 
 loadDrivers();
