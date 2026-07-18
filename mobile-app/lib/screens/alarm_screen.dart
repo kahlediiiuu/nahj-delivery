@@ -123,6 +123,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime, // إضافة هذا السطر لحل المشكلة وتخطي خطأ البناء
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }
