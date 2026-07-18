@@ -109,6 +109,60 @@ router.get('/day', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
+const gradeThresholds = [
+  { grade: 'A', min: 0.90 },
+  { grade: 'B', min: 0.75 },
+  { grade: 'C', min: 0.60 },
+  { grade: 'D', min: 0.45 },
+  { grade: 'E', min: 0.30 },
+  { grade: 'F', min: 0 },
+];
+
+function analyzeReasons(d) {
+  const reasons = [];
+  const tips = [];
+
+  if ((d.onTimeDeliveryScore || 0) < 85) {
+    reasons.push('انخفاض نسبة الالتزام بوقت التوصيل');
+    tips.push('حافظ على الوصول في الوقت المحدد لأكثر من 90% من طلباتك');
+  }
+  if ((d.verificationSuccessRate || 0) < 90) {
+    reasons.push('انخفاض نسبة نجاح التحقق من التسليم');
+    tips.push('تأكد من إتمام خطوة التحقق (توقيع/صورة/رمز) في كل عملية تسليم');
+  }
+  if ((d.failedOrders || 0) > 0 && d.grossOrders && (d.failedOrders / d.grossOrders) > 0.05) {
+    reasons.push('ارتفاع عدد الطلبات الفاشلة نسبيًا');
+    tips.push('قلل الطلبات الفاشلة عبر التواصل المبكر مع العميل عند وجود مشكلة بالعنوان');
+  }
+  if ((d.finalQualityScore || 0) < 0.6) {
+    reasons.push('انخفاض عام في درجة جودة التوصيل');
+  }
+  if (reasons.length === 0) {
+    reasons.push('أداء متوازن في كل المؤشرات الرئيسية');
+  }
+  if (tips.length === 0) {
+    tips.push('استمر بنفس المستوى، وحافظ على انتظامك اليومي لتصل للفئة الذهبية');
+  }
+
+  return { reasons, tips };
+}
+
+function computeProgress(finalQualityScore) {
+  const score = finalQualityScore || 0;
+  const currentIndex = gradeThresholds.findIndex((g) => score >= g.min);
+  if (currentIndex <= 0) return null;
+  const nextGrade = gradeThresholds[currentIndex - 1];
+  const currentGrade = gradeThresholds[currentIndex];
+  const pointsNeeded = Math.max(0, nextGrade.min - score);
+  const rangeSize = nextGrade.min - currentGrade.min;
+  const progressWithinRange = rangeSize > 0 ? (score - currentGrade.min) / rangeSize : 0;
+  return {
+    nextGrade: nextGrade.grade,
+    pointsNeeded: +(pointsNeeded * 100).toFixed(1),
+    progressPercent: Math.max(0, Math.min(100, +(progressWithinRange * 100).toFixed(0))),
+  };
+}
+
 router.get('/my', verifyToken, async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -124,7 +178,33 @@ router.get('/my', verifyToken, async (req, res) => {
     if (!doc.exists) {
       return res.json({ success: true, date, found: false });
     }
-    res.json({ success: true, date, found: true, ...doc.data() });
+
+    const d = doc.data();
+    const { reasons, tips } = analyzeReasons(d);
+    const progress = computeProgress(d.finalQualityScore);
+
+    let comparison = null;
+    try {
+      const prevDate = new Date(new Date(date).getTime() - 86400000).toISOString().slice(0, 10);
+      const prevDoc = await db.collection('dailyPerformance').doc(`${req.user.driverId}_${prevDate}`).get();
+      if (prevDoc.exists) {
+        const prevScore = prevDoc.data().finalQualityScore || 0;
+        const currScore = d.finalQualityScore || 0;
+        const diff = +((currScore - prevScore) * 100).toFixed(1);
+        comparison = { diffPercent: diff, improved: diff >= 0 };
+      }
+    } catch (_) {}
+
+    res.json({
+      success: true,
+      date,
+      found: true,
+      ...d,
+      reasons,
+      tips,
+      progress,
+      comparison,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
