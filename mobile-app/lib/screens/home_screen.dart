@@ -17,6 +17,7 @@ import 'work_hours_screen.dart';
 import 'daily_notes_screen.dart';
 import 'announcements_screen.dart';
 import 'alarm_screen.dart';
+import 'operations_report_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -457,6 +458,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _featureCard('📊', AppStrings.get('myDailyReport'), Colors.blueGrey, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyReportScreen()))),
                 _featureCard('📢', 'أخبار الشركة', Colors.pink, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AnnouncementsScreen()))),
                 _featureCard('⏰', 'منبه بدء الدوام', Colors.amber, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AlarmScreen()))),
+                _featureCard('📈', 'تقرير التشغيل', Colors.cyan, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const OperationsReportScreen()))),
               ],
             ),
 
