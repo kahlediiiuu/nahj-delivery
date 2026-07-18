@@ -6,12 +6,11 @@ const { sendPushToDriver } = require('../utils/push');
 
 router.use(verifyToken);
 
-// ================= إعدادات الأسعار (قابلة للتعديل من لوحة التحكم دون لمس الكود) =================
 const DEFAULT_RATES = {
-  orderPrice: 8,           // سعر الطلب الواحد (ريال)
-  extraKmPrice: 1.15,      // سعر كل كيلومتر إضافي بعد الحد المجاني
-  freeKmThreshold: 20,     // عدد الكيلومترات المجانية ضمن الطلب
-  ratingBonus: { A: 2.75, B: 2.25, C: 1.95, D: 1.25, E: 0, F: 0 }, // مكافأة التقييم لكل طلب حسب الفئة
+  orderPrice: 8,
+  extraKmPrice: 1.15,
+  freeKmThreshold: 20,
+  ratingBonus: { A: 2.75, B: 2.25, C: 1.95, D: 1.25, E: 0, F: 0 },
 };
 
 router.get('/rates', requireAdmin, async (req, res) => {
@@ -39,7 +38,6 @@ async function getRates() {
   return doc.exists ? { ...DEFAULT_RATES, ...doc.data() } : DEFAULT_RATES;
 }
 
-// يحسب الإجمالي قبل وبعد الخصومات تلقائيًا بناءً على المدخلات والأسعار الحالية
 function computeTotals(entry, rates) {
   const deliveryValue = (entry.totalOrders || 0) * rates.orderPrice;
   const extraKm = Math.max(0, (entry.totalDistanceKm || 0) - rates.freeKmThreshold * (entry.totalOrders || 0));
@@ -54,59 +52,46 @@ function computeTotals(entry, rates) {
   return { deliveryValue, distanceValue, ratingBonusPerOrder, ratingBonusTotal, totalBeforeDeductions, deductionsTotal, totalAfterDeductions };
 }
 
-// ================= إدخال/تعديل مستحقات مندوب لشهر معيّن (من لوحة التحكم يدويًا) =================
-router.post('/:driverId/:month', requireAdmin, async (req, res) => {
+async function getAdvanceBalance(driverId) {
+  const snap = await db
+    .collection('advanceRequests')
+    .where('driverId', '==', driverId)
+    .where('status', '==', 'approved')
+    .get();
+  const advances = snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((a) => !a.settled)
+    .sort((a, b) => a.createdAt - b.createdAt);
+  const totalOutstanding = advances.reduce((sum, a) => sum + (a.amount || 0), 0);
+  return { advances, totalOutstanding };
+}
+
+// ⚠️ ترتيب المسارات حاسم في Express: كل مسار "محدد" (literal) يجب أن يُسجَّل قبل أي مسار "عام" (:param)
+// بنفس عدد الأجزاء، وإلا فسيلتقطه المسار العام بالخطأ. لذلك كل ما يلي مُرتَّب بعناية فائقة.
+
+router.get('/:driverId/advance-balance', requireAdmin, async (req, res) => {
   try {
-    const { driverId, month } = req.params; // month بصيغة YYYY-MM
-    const { totalOrders, totalDeliveryValue, totalDistanceKm, grade, deductions, notes } = req.body;
-
-    const rates = await getRates();
-    const entryInput = { totalOrders, totalDistanceKm, grade, deductions: deductions || [] };
-    const computed = computeTotals(entryInput, rates);
-
-    const finalEntry = {
-      driverId,
-      month,
-      totalOrders: totalOrders || 0,
-      totalDeliveryValue: totalDeliveryValue !== undefined ? totalDeliveryValue : computed.deliveryValue,
-      totalDistanceKm: totalDistanceKm || 0,
-      distanceValue: computed.distanceValue,
-      grade: grade || null,
-      ratingBonusPerOrder: computed.ratingBonusPerOrder,
-      ratingBonusTotal: computed.ratingBonusTotal,
-      deductions: deductions || [],
-      totalBeforeDeductions: (totalDeliveryValue !== undefined ? totalDeliveryValue : computed.deliveryValue) + computed.distanceValue + computed.ratingBonusTotal,
-      deductionsTotal: computed.deductionsTotal,
-      totalAfterDeductions: 0,
-      notes: notes || '',
-      updatedAt: Date.now(),
-    };
-    finalEntry.totalAfterDeductions = Math.max(0, finalEntry.totalBeforeDeductions - finalEntry.deductionsTotal);
-
-    await db.collection('payroll').doc(`${driverId}_${month}`).set(finalEntry);
-
-    await sendPushToDriver(driverId, '💰 تحديث في مستحقاتك', `تم تحديث بيانات مستحقاتك لشهر ${month}، يمكنك مراجعتها الآن`, {});
-
-    res.json({ success: true, entry: finalEntry });
+    const balance = await getAdvanceBalance(req.params.driverId);
+    res.json({ success: true, ...balance });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
   }
 });
 
-// المشرف: عرض مستحقات مندوب معيّن لشهر معيّن
-router.get('/:driverId/:month', requireAdmin, async (req, res) => {
+router.get('/:driverId/history', requireAdmin, async (req, res) => {
   try {
-    const doc = await db.collection('payroll').doc(`${req.params.driverId}_${req.params.month}`).get();
-    if (!doc.exists) return res.json({ success: true, found: false });
-    res.json({ success: true, found: true, entry: doc.data() });
+    const snap = await db.collection('payroll').where('driverId', '==', req.params.driverId).get();
+    const history = snap.docs
+      .map((d) => d.data())
+      .sort((a, b) => (b.month || '').localeCompare(a.month || ''));
+    res.json({ success: true, history });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
   }
 });
 
-// المندوب: عرض مستحقاته الخاصة لشهر معيّن
 router.get('/my', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -122,7 +107,6 @@ router.get('/my', async (req, res) => {
   }
 });
 
-// ================= طلبات السلف (المندوب يطلب، المشرف يوافق/يرفض) =================
 router.post('/advance', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -137,6 +121,7 @@ router.post('/advance', async (req, res) => {
       amount: Number(amount),
       reason: reason || '',
       status: 'pending',
+      settled: false,
       createdAt: Date.now(),
     });
     res.json({ success: true, id: docRef.id });
@@ -184,10 +169,93 @@ router.patch('/advance/:id', requireAdmin, async (req, res) => {
 
     await db.collection('advanceRequests').doc(req.params.id).update({ status, decidedAt: Date.now() });
 
+    if (status === 'approved') {
+      await db.collection('dailyNotes').add({
+        driverId: doc.data().driverId,
+        type: 'other',
+        note: `📋 سجل تلقائي: تمت الموافقة على طلب سلفة بمبلغ ${doc.data().amount} ريال، وستُخصم من مستحقاته القادمة تلقائيًا عند إصدار الراتب.`,
+        attachmentData: null,
+        attachmentType: null,
+        createdAt: Date.now(),
+        seenByAdmin: true,
+        isSystemGenerated: true,
+      });
+    }
+
     const statusText = status === 'approved' ? '✅ تم قبول طلب السلفة الخاص بك' : '❌ تم رفض طلب السلفة الخاص بك';
     await sendPushToDriver(doc.data().driverId, statusText, `المبلغ: ${doc.data().amount} ريال`, {});
 
     res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+// المسارات التالية "عامة" (:driverId/:month) - يجب أن تبقى آخر شيء في الملف دائمًا
+router.post('/:driverId/:month', requireAdmin, async (req, res) => {
+  try {
+    const { driverId, month } = req.params;
+    const { totalOrders, totalDeliveryValue, totalDistanceKm, grade, deductions, notes, notifyDriver, settledAdvanceIds } = req.body;
+
+    const rates = await getRates();
+    const entryInput = { totalOrders, totalDistanceKm, grade, deductions: deductions || [] };
+    const computed = computeTotals(entryInput, rates);
+
+    const existingDoc = await db.collection('payroll').doc(`${driverId}_${month}`).get();
+    const isEdit = existingDoc.exists;
+
+    const finalEntry = {
+      driverId,
+      month,
+      totalOrders: totalOrders || 0,
+      totalDeliveryValue: totalDeliveryValue !== undefined ? totalDeliveryValue : computed.deliveryValue,
+      totalDistanceKm: totalDistanceKm || 0,
+      distanceValue: computed.distanceValue,
+      grade: grade || null,
+      ratingBonusPerOrder: computed.ratingBonusPerOrder,
+      ratingBonusTotal: computed.ratingBonusTotal,
+      deductions: deductions || [],
+      totalBeforeDeductions: (totalDeliveryValue !== undefined ? totalDeliveryValue : computed.deliveryValue) + computed.distanceValue + computed.ratingBonusTotal,
+      deductionsTotal: computed.deductionsTotal,
+      totalAfterDeductions: 0,
+      notes: notes || '',
+      updatedAt: Date.now(),
+      createdAt: isEdit ? existingDoc.data().createdAt : Date.now(),
+      editHistory: isEdit ? [...(existingDoc.data().editHistory || []), { editedAt: Date.now() }] : [],
+    };
+    finalEntry.totalAfterDeductions = Math.max(0, finalEntry.totalBeforeDeductions - finalEntry.deductionsTotal);
+
+    await db.collection('payroll').doc(`${driverId}_${month}`).set(finalEntry);
+
+    if (Array.isArray(settledAdvanceIds) && settledAdvanceIds.length > 0) {
+      await Promise.all(
+        settledAdvanceIds.map((id) => db.collection('advanceRequests').doc(id).update({ settled: true, settledInMonth: month }))
+      );
+    }
+
+    const shouldNotify = !isEdit || notifyDriver === true;
+    if (shouldNotify) {
+      await sendPushToDriver(
+        driverId,
+        isEdit ? '💰 تم تعديل مستحقاتك' : '💰 مستحقاتك جاهزة',
+        `راجع تفاصيل مستحقاتك لشهر ${month} في تطبيقك`,
+        {}
+      );
+    }
+
+    res.json({ success: true, entry: finalEntry, notified: shouldNotify });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+router.get('/:driverId/:month', requireAdmin, async (req, res) => {
+  try {
+    const doc = await db.collection('payroll').doc(`${req.params.driverId}_${req.params.month}`).get();
+    if (!doc.exists) return res.json({ success: true, found: false });
+    res.json({ success: true, found: true, entry: doc.data() });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
