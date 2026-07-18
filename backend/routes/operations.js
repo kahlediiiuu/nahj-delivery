@@ -159,4 +159,55 @@ router.patch('/:driverId/:date', requireAdmin, async (req, res) => {
   }
 });
 
+// المندوب يضيف تعليقًا على تقرير تشغيله لهذا اليوم
+router.post('/:driverId/:date/comments', verifyToken, async (req, res) => {
+  try {
+    const { driverId, date } = req.params;
+    if (req.user.role === 'driver' && req.user.driverId !== driverId) {
+      return res.status(403).json({ success: false, message: 'غير مسموح' });
+    }
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, message: 'اكتب تعليقك أولًا' });
+    }
+    const docRef = await db.collection('reportComments').add({
+      driverId,
+      date,
+      reportType: 'operations',
+      sender: req.user.role,
+      text: text.trim(),
+      createdAt: Date.now(),
+      requiresResponse: false,
+      response: null,
+    });
+    res.json({ success: true, id: docRef.id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+// جلب تعليقات تقرير تشغيل يوم معيّن لمندوب معيّن
+router.get('/:driverId/:date/comments', verifyToken, async (req, res) => {
+  try {
+    const { driverId, date } = req.params;
+    if (req.user.role === 'driver' && req.user.driverId !== driverId) {
+      return res.status(403).json({ success: false, message: 'غير مسموح' });
+    }
+    const snap = await db
+      .collection('reportComments')
+      .where('driverId', '==', driverId)
+      .where('date', '==', date)
+      .where('reportType', '==', 'operations')
+      .get();
+    const comments = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => a.createdAt - b.createdAt);
+    res.json({ success: true, comments });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
 module.exports = router;
