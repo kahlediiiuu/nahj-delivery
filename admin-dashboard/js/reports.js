@@ -236,14 +236,22 @@ async function loadLeaveRequests() {
 }
 
 window.decideLeave = async function (id, status) {
+  const statusLabel = status === 'approved' ? 'قبول' : 'رفض';
+  const adminNote = prompt(
+    `ملاحظة اختيارية سترسل للمندوب مع قرار ${statusLabel} (مثال: "أرسل لي إثبات الغياب")، أو اتركها فارغة:`,
+    ''
+  );
+  if (adminNote === null) return; // ضغط "إلغاء" = تراجع تام عن القرار
+
   try {
     const res = await fetch(`${API_URL}/leave/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, adminNote }),
     });
     const data = await res.json();
     if (res.ok && data.success) {
+      alert(`✅ تم ${statusLabel} الطلب بنجاح ووصل إشعار فوري للمندوب.\n(سيختفي من هذه القائمة لأن الفلتر الحالي "قيد المراجعة فقط" - غيّر الفلتر أعلاه لرؤية كل الحالات)`);
       loadLeaveRequests();
     } else {
       alert('❌ فشل تحديث حالة الإجازة: ' + (data.message || `رمز الخطأ ${res.status}`));
@@ -355,8 +363,14 @@ async function loadDailyNotes() {
       const img = n.attachmentData
         ? `<img src="data:${n.attachmentType};base64,${n.attachmentData}" style="max-width:200px;border-radius:8px;margin-top:8px;display:block;">`
         : '';
+      const responseBlock = n.response
+        ? `<div style="margin-top:8px;padding:8px;background:#eef2ff;border-radius:8px;font-size:13px;">💬 ردّك: ${n.response}</div>`
+        : '';
+      const driverReplyBlock = n.driverReply
+        ? `<div style="margin-top:8px;padding:8px;background:#f0fdf4;border-radius:8px;font-size:13px;">👤 رد المندوب: ${n.driverReply}</div>`
+        : '';
       return `
-        <div style="background:#fff;border-radius:10px;padding:14px;margin-bottom:10px;">
+        <div style="background:#fff;border-radius:10px;padding:14px;margin-bottom:10px;" id="note-${n.id}">
           <div style="display:flex;justify-content:space-between;">
             <b>${noteTypeLabels[n.type] || n.type}</b>
             <span style="font-size:12px;color:#94a3b8;">${time}</span>
@@ -364,10 +378,56 @@ async function loadDailyNotes() {
           <div style="font-size:13px;color:#64748b;margin:4px 0;">${d.name || n.driverId} — #${d.driverCode || ''}</div>
           ${n.note ? `<div style="font-size:14px;">${n.note}</div>` : ''}
           ${img}
+          ${responseBlock}
+          ${driverReplyBlock}
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <input type="text" id="reply-note-${n.id}" placeholder="اكتب ردًا (مثال: أرسل لي صورة إثبات)..." style="flex:1;padding:6px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+            <button onclick="window.replyToNote('${n.id}')" style="padding:6px 12px;background:#0f172a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">رد</button>
+            <button onclick="window.deleteNote('${n.id}')" style="padding:6px 12px;background:#dc2626;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">حذف</button>
+          </div>
         </div>`;
     })
     .join('');
 }
+
+window.replyToNote = async function (noteId) {
+  const input = document.getElementById(`reply-note-${noteId}`);
+  const text = input.value.trim();
+  if (!text) return alert('اكتب نص الرد أولًا');
+  try {
+    const res = await fetch(`${API_URL}/dailynotes/${noteId}/reply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ text }),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      loadDailyNotes();
+    } else {
+      alert('❌ فشل إرسال الرد: ' + (data.message || 'خطأ غير معروف'));
+    }
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم');
+  }
+};
+
+window.deleteNote = async function (noteId) {
+  if (!confirm('حذف هذه الملاحظة نهائيًا؟')) return;
+  try {
+    const res = await fetch(`${API_URL}/dailynotes/${noteId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      loadDailyNotes();
+    } else {
+      alert('❌ فشل الحذف: ' + (data.message || 'خطأ غير معروف'));
+    }
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم');
+  }
+};
 
 document.getElementById('loadDailyNotesBtn').addEventListener('click', loadDailyNotes);
 document.getElementById('noteTypeFilter').addEventListener('change', loadDailyNotes);
