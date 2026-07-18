@@ -241,7 +241,14 @@ refreshControl.onAdd = function () {
   btn.style.cssText = 'width:40px;height:40px;background:#fff;border:2px solid rgba(0,0,0,.2);border-radius:6px;font-size:20px;cursor:pointer;';
   L.DomEvent.disableClickPropagation(btn);
   btn.onclick = () => {
-    if (window.nahjSocket) window.nahjSocket.emit('request:locations');
+    if (window.nahjSocket && window.nahjSocket.connected) {
+      window.nahjSocket.emit('request:locations');
+    } else {
+      // الاتصال اللحظي منقطع فعليًا - نعتمد بديلاً احتياطيًا: إعادة تحميل بيانات المناديب الأساسية
+      // (لن تُحدِّث المواقع اللحظية، لكنها تؤكد للمشرف أن الاتصال العام بالخادم لا يزال يعمل)
+      if (typeof loadDrivers === 'function') loadDrivers();
+      alert('⚠️ الاتصال المباشر بالخادم منقطع حاليًا، يُعاد الاتصال تلقائيًا خلال ثوانٍ. حدّث الصفحة إن استمرت المشكلة.');
+    }
     btn.style.transform = 'rotate(360deg)';
     btn.style.transition = 'transform .5s';
     setTimeout(() => { btn.style.transform = ''; btn.style.transition = ''; }, 500);
