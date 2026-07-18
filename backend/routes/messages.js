@@ -6,7 +6,13 @@ const { sendPushToDriver } = require('../utils/push');
 
 router.use(verifyToken);
 
-// إرسال رسالة (يستخدمه المشرف بتحديد driverId، أو المندوب لنفسه تلقائياً)
+/**
+ * ⚠️ ملاحظة أداء حرجة: لا نُحمِّل أبدًا مجموعة "messages" كاملة إلى الذاكرة (كانت هذه هي
+ * السبب المباشر لانهيار الخادم بـ "heap out of memory"). بدلاً من ذلك، نحتفظ بملخص
+ * (آخر رسالة + عدد غير المقروء) مباشرة داخل مستند كل مندوب في "drivers"، ونحدّثه فقط
+ * عند إرسال/قراءة رسالة - بهذا تبقى قراءة "قائمة المحادثات" خفيفة جدًا مهما كبر السجل.
+ */
+
 router.post('/', async (req, res) => {
   try {
     const { text, requiresResponse } = req.body;
@@ -38,6 +44,16 @@ router.post('/', async (req, res) => {
       response: null,
     });
 
+    // تحديث الملخص الخفيف على مستند المندوب مباشرة (بدون أي استعلام إضافي على الرسائل)
+    const driverUpdate = {
+      lastMessageText: text.trim().slice(0, 200), // نكتفي بأول 200 حرف للمعاينة فقط
+      lastMessageAt: now,
+    };
+    if (sender === 'driver') {
+      driverUpdate.unreadFromDriverCount = require('firebase-admin').firestore.FieldValue.increment(1);
+    }
+    await db.collection('drivers').doc(driverId).set(driverUpdate, { merge: true });
+
     if (sender === 'admin') {
       if (requiresResponse) {
         await sendPushToDriver(
@@ -49,6 +65,7 @@ router.post('/', async (req, res) => {
           null
         );
       } else {
+        // دمج الإشعارات: نحسب العدد الإجمالي غير المقروء لهذا المندوب تحديدًا (استعلام مُفهرَس صغير، وليس تحميل الكل)
         const unreadSnap = await db
           .collection('messages')
           .where('driverId', '==', driverId)
@@ -78,7 +95,6 @@ router.post('/', async (req, res) => {
   }
 });
 
-// المندوب يردّ على تنبيه إلزامي بسبب محدد - يصل الرد فورًا للمشرف
 router.post('/:id/respond', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -99,7 +115,7 @@ router.post('/:id/respond', async (req, res) => {
   }
 });
 
-// المشرف: جلب محادثة كاملة مع مندوب محدد
+// المشرف: جلب محادثة كاملة مع مندوب محدد فقط (استعلام مُفهرَس، ليس تحميل الكل)
 router.get('/driver/:driverId', requireAdmin, async (req, res) => {
   try {
     const snap = await db
@@ -111,9 +127,11 @@ router.get('/driver/:driverId', requireAdmin, async (req, res) => {
       .map((d) => ({ id: d.id, ...d.data() }))
       .sort((a, b) => a.createdAt - b.createdAt);
 
-    // تعليم رسائل المندوب كمقروءة من المشرف
     const unread = snap.docs.filter((d) => d.data().sender === 'driver' && !d.data().readByAdmin);
     await Promise.all(unread.map((d) => d.ref.update({ readByAdmin: true })));
+
+    // تصفير عداد غير المقروء الخفيف على مستند المندوب بمجرد فتح المحادثة
+    await db.collection('drivers').doc(req.params.driverId).set({ unreadFromDriverCount: 0 }, { merge: true });
 
     res.json({ success: true, messages });
   } catch (err) {
@@ -122,26 +140,24 @@ router.get('/driver/:driverId', requireAdmin, async (req, res) => {
   }
 });
 
-// المشرف: قائمة كل المحادثات مع عدد الرسائل غير المقروءة لكل مندوب
+// المشرف: قائمة كل المحادثات - الآن تقرأ فقط مستندات المناديب الخفيفة (بدون لمس مجموعة الرسائل إطلاقًا)
 router.get('/conversations', requireAdmin, async (req, res) => {
   try {
     const driversSnap = await db.collection('drivers').get();
-    const messagesSnap = await db.collection('messages').get();
-    const allMessages = messagesSnap.docs.map((d) => d.data());
 
-    const result = driversSnap.docs.map((d) => {
-      const driverMessages = allMessages.filter((m) => m.driverId === d.id);
-      const unread = driverMessages.filter((m) => m.sender === 'driver' && !m.readByAdmin).length;
-      const last = driverMessages.sort((a, b) => b.createdAt - a.createdAt)[0];
-      return {
-        driverId: d.id,
-        name: d.data().name,
-        driverCode: d.data().driverCode,
-        unreadCount: unread,
-        lastMessage: last ? last.text : null,
-        lastMessageAt: last ? last.createdAt : null,
-      };
-    });
+    const result = driversSnap.docs
+      .map((d) => {
+        const data = d.data();
+        return {
+          driverId: d.id,
+          name: data.name,
+          driverCode: data.driverCode,
+          unreadCount: data.unreadFromDriverCount || 0,
+          lastMessage: data.lastMessageText || null,
+          lastMessageAt: data.lastMessageAt || null,
+        };
+      })
+      .filter((c) => c.lastMessageAt); // نعرض فقط من لديه محادثة فعلية
 
     result.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
     res.json({ success: true, conversations: result });
@@ -151,7 +167,6 @@ router.get('/conversations', requireAdmin, async (req, res) => {
   }
 });
 
-// المندوب: جلب محادثته الخاصة مع المشرف (فقط آخر 24 ساعة - السجل الكامل يبقى محفوظاً للإدارة دائماً)
 router.get('/my', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -178,7 +193,6 @@ router.get('/my', async (req, res) => {
   }
 });
 
-// المندوب: هل توجد رسائل جديدة؟ (فحص سريع وخفيف للاستطلاع الدوري)
 router.get('/my/unread-count', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -197,11 +211,9 @@ router.get('/my/unread-count', async (req, res) => {
   }
 });
 
-// المشرف: حذف رسالة من السجل نهائياً
 router.delete('/:id', async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
-      // المندوب يستطيع حذف رسالته/محادثته فقط من واجهته، وليس رسائل غيره
       const doc = await db.collection('messages').doc(req.params.id).get();
       if (!doc.exists || doc.data().driverId !== req.user.driverId) {
         return res.status(403).json({ success: false, message: 'غير مسموح' });
@@ -215,7 +227,6 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// المشرف: إعادة إرسال إشعار Push لرسالة سابقة (مفيد إن لم يكن المندوب قد سجّل رمز جهازه وقتها)
 router.post('/:id/resend', requireAdmin, async (req, res) => {
   try {
     const doc = await db.collection('messages').doc(req.params.id).get();
@@ -229,11 +240,9 @@ router.post('/:id/resend', requireAdmin, async (req, res) => {
   }
 });
 
-// إرسال إشعار جماعي: للجميع، أو لمناديب لغة معينة، أو لقائمة محددة من المعرّفات - كل مندوب يصله بلغته إن توفرت ترجمة
 router.post('/broadcast', requireAdmin, async (req, res) => {
   try {
     const { target, texts, driverIds } = req.body;
-    // texts: { ar: '...', en: '...', bn: '...' } - نص لكل لغة (أو نص واحد فقط في ar وسيُستخدم للجميع كحل بديل)
     if (!texts || !texts.ar) {
       return res.status(400).json({ success: false, message: 'يجب كتابة النص العربي على الأقل' });
     }
@@ -245,8 +254,8 @@ router.post('/broadcast', requireAdmin, async (req, res) => {
     if (target === 'byIds' && Array.isArray(driverIds)) {
       targets = targets.filter((d) => driverIds.includes(d.id));
     }
-    // target === 'all' لا يحتاج فلترة إضافية
 
+    const now = Date.now();
     const writes = targets.map(async (doc) => {
       const driverLang = doc.data().language || 'ar';
       const text = texts[driverLang] || texts.ar;
@@ -254,10 +263,11 @@ router.post('/broadcast', requireAdmin, async (req, res) => {
         driverId: doc.id,
         sender: 'admin',
         text,
-        createdAt: Date.now(),
+        createdAt: now,
         readByAdmin: true,
         readByDriver: false,
       });
+      await db.collection('drivers').doc(doc.id).set({ lastMessageText: text.slice(0, 200), lastMessageAt: now }, { merge: true });
       await sendPushToDriver(doc.id, '📢 رسالة من الإدارة', text, {});
     });
 
@@ -269,11 +279,11 @@ router.post('/broadcast', requireAdmin, async (req, res) => {
   }
 });
 
-// المشرف: حذف محادثة كاملة مع مندوب معيّن نهائيًا
 router.delete('/driver/:driverId/all', requireAdmin, async (req, res) => {
   try {
     const snap = await db.collection('messages').where('driverId', '==', req.params.driverId).get();
     await Promise.all(snap.docs.map((d) => d.ref.delete()));
+    await db.collection('drivers').doc(req.params.driverId).set({ lastMessageText: null, lastMessageAt: null, unreadFromDriverCount: 0 }, { merge: true });
     res.json({ success: true, deletedCount: snap.size });
   } catch (err) {
     console.error(err);
@@ -281,7 +291,6 @@ router.delete('/driver/:driverId/all', requireAdmin, async (req, res) => {
   }
 });
 
-// المندوب: تحديد كل رسائله كمقروءة دفعة واحدة (يُصفّر عداد الإشعارات المُدمَجة)
 router.post('/my/mark-all-read', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -301,7 +310,6 @@ router.post('/my/mark-all-read', async (req, res) => {
   }
 });
 
-// المندوب: حذف كل رسائله الخاصة (من طرفه هو فقط، لا يمس السجل الكامل عند الإدارة)
 router.delete('/my/all', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
