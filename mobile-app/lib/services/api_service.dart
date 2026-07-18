@@ -414,6 +414,34 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  static Future<Map<String, dynamic>> getMyPayroll({String? month}) async {
+    final token = await getToken();
+    final uri = month != null
+        ? Uri.parse('$baseUrl/payroll/my?month=$month')
+        : Uri.parse('$baseUrl/payroll/my');
+    final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'}).timeout(const Duration(seconds: 30));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> submitAdvanceRequest(double amount, String reason) async {
+    final token = await getToken();
+    final res = await http.post(
+      Uri.parse('$baseUrl/payroll/advance'),
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      body: jsonEncode({'amount': amount, 'reason': reason}),
+    ).timeout(const Duration(seconds: 30));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getMyAdvanceRequests() async {
+    final token = await getToken();
+    final res = await http.get(
+      Uri.parse('$baseUrl/payroll/advance/my'),
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 30));
+    return jsonDecode(res.body);
+  }
+
   static Future<Map<String, dynamic>> getMyOperationsReport({String? date}) async {
     final token = await getToken();
     final uri = date != null
