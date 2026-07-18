@@ -87,4 +87,78 @@ router.patch('/:id/seen', requireAdmin, async (req, res) => {
   }
 });
 
+// المشرف: الرد على ملاحظة المندوب (مثال: "أرسل لي صورة إثبات") - يصل كإشعار فوري للمندوب
+router.post('/:id/reply', requireAdmin, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, message: 'اكتب نص الرد أولًا' });
+    }
+    const doc = await db.collection('dailyNotes').doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).json({ success: false, message: 'الملاحظة غير موجودة' });
+
+    await db.collection('dailyNotes').doc(req.params.id).update({
+      response: text.trim(),
+      respondedAt: Date.now(),
+      seenByAdmin: true,
+    });
+
+    const { sendPushToDriver } = require('../utils/push');
+    await sendPushToDriver(doc.data().driverId, '📝 ردّت الإدارة على ملاحظتك', text.trim(), {});
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+// المشرف: تعديل رد سابق
+router.patch('/:id/response', requireAdmin, async (req, res) => {
+  try {
+    const { response } = req.body;
+    await db.collection('dailyNotes').doc(req.params.id).update({ response: response || '' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+// المشرف: حذف الملاحظة نهائيًا
+router.delete('/:id', requireAdmin, async (req, res) => {
+  try {
+    await db.collection('dailyNotes').doc(req.params.id).delete();
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+// المندوب: يرد على رد الإدارة على ملاحظته (محادثة كاملة رد↔استقبال)
+router.post('/:id/driver-reply', async (req, res) => {
+  try {
+    if (req.user.role !== 'driver') {
+      return res.status(403).json({ success: false, message: 'مسموح للمناديب فقط' });
+    }
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, message: 'اكتب ردك أولًا' });
+    }
+    const doc = await db.collection('dailyNotes').doc(req.params.id).get();
+    if (!doc.exists || doc.data().driverId !== req.user.driverId) {
+      return res.status(403).json({ success: false, message: 'غير مسموح' });
+    }
+    await db.collection('dailyNotes').doc(req.params.id).update({
+      driverReply: text.trim(),
+      driverRepliedAt: Date.now(),
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
 module.exports = router;
