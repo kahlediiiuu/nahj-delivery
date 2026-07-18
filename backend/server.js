@@ -44,6 +44,7 @@ app.use('/api/dailynotes', dailyNotesRoutes);
 app.use('/api/announcements', announcementsRoutes);
 app.use('/api/operations', operationsRoutes);
 
+// بث المواقع اللحظية إلى لوحة التحكم عبر WebSocket
 initLiveTracking(io);
 
 const PORT = process.env.PORT || 3000;

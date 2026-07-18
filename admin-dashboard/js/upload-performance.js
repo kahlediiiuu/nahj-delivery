@@ -19,11 +19,13 @@ loadDrivers();
 const yesterday = new Date(Date.now() - 86400000);
 document.getElementById('reportDate').valueAsDate = yesterday;
 
+// مطابقة تلقائية دقيقة عبر rider_id (يُطابَق مع رمز المطابقة المسجَّل لكل مندوب في صفحة إدارة المناديب)
 function matchDriverByRiderId(riderId) {
   if (!riderId) return '';
   const clean = String(riderId).trim();
   const byCode = driversList.find((d) => d.matchCode && String(d.matchCode).trim() === clean);
   if (byCode) return byCode.id;
+  // احتياطي: قد يكون رقم المندوب نفسه (driverCode) مطابقًا لرقم rider_id في بعض الحالات
   const byDriverCode = driversList.find((d) => d.driverCode && String(d.driverCode).trim() === clean);
   return byDriverCode ? byDriverCode.id : '';
 }
@@ -47,6 +49,7 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
     const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
 
     parsedRows = rows.map((row) => {
+      // نبحث عن الأعمدة بمرونة (تدعم الصيغة الحقيقية rider_id, gross_orders...، وأيضًا صيغًا عربية بديلة)
       const findVal = (patterns) => {
         const key = Object.keys(row).find((k) => patterns.some((p) => k.toLowerCase().includes(p)));
         return key !== undefined ? row[key] : '';
@@ -54,6 +57,7 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
 
       const riderId = findVal(['rider_id', 'rider id', 'معرف', 'id']);
       const segment = String(findVal(['segment', 'الفئة', 'فئة'])).trim().toUpperCase();
+      // completed_orders قد يلتبس مع completed_orders_in_time لأنه جزء منه نصيًا - نبحث عن المطابقة الدقيقة أولاً
       const completedOrdersExact = row['completed_orders'] !== undefined ? row['completed_orders'] : findVal(['completed_orders']);
 
       return {
@@ -121,9 +125,12 @@ window.updateRow = function (index, field, value) {
   parsedRows[index][field] = value;
 };
 
-document.getElementById('submitBtn').addEventListener('click', async () => {
+document.getElementById('submitBtn').addEventListener('click', () => submitReport(false));
+
+async function submitReport(confirmReplace) {
   const date = document.getElementById('reportDate').value;
   const msg = document.getElementById('uploadMsg');
+  const submitBtn = document.getElementById('submitBtn');
   const validRows = parsedRows.filter((r) => r.driverId);
 
   if (validRows.length === 0) {
@@ -132,15 +139,30 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
     return;
   }
 
+  // منع الضغط المتكرر: تعطيل الزر فورًا حتى انتهاء العملية بالكامل
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'جاري الرفع...';
+
   try {
     const res = await fetch(`${NAHJ_API_URL}/performance/upload`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ date, records: validRows }),
+      body: JSON.stringify({ date, records: validRows, confirmReplace }),
     });
     const data = await res.json();
+
+    if (res.status === 409 && data.duplicate) {
+      const wantsReplace = confirm(data.message + '\n\nاضغط "موافق" للاستبدال، أو "إلغاء" للتراجع.');
+      submitBtn.disabled = false;
+      submitBtn.textContent = '✅ رفع التقرير لكل المناديب';
+      if (wantsReplace) {
+        await submitReport(true);
+      }
+      return;
+    }
+
     if (data.success) {
-      msg.textContent = `تم رفع تقرير ${data.count} مندوب بنجاح ليوم ${date} (وسُجِّل ${data.absentCount} كغائبين)، ووصلهم إشعار فوري بذلك.`;
+      msg.textContent = `تم رفع تقرير ${data.count} مندوب بنجاح ليوم ${date} (وسُجِّل ${data.absentCount} كغائبين)${confirmReplace ? '، تم تحديث التقرير بصمت بدون إشعارات مكررة' : '، ووصلهم إشعار فوري بذلك'}.`;
       msg.style.color = '#16a34a';
     } else {
       msg.textContent = data.message || 'حدث خطأ';
@@ -149,5 +171,8 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
   } catch (err) {
     msg.textContent = 'تعذّر الاتصال بالخادم';
     msg.style.color = '#dc2626';
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = '✅ رفع التقرير لكل المناديب';
   }
-});
+}

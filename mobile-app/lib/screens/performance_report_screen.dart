@@ -185,6 +185,7 @@ class _PerformanceReportScreenState extends State<PerformanceReportScreen> with 
                 ),
               )
             else ...[
+              // ===== بطاقة الفئة (بتصميم فاخر متحرك للفئتين A وB) =====
               AnimatedBuilder(
                 animation: _shineController,
                 builder: (context, child) {
@@ -263,6 +264,118 @@ class _PerformanceReportScreenState extends State<PerformanceReportScreen> with 
 
               const SizedBox(height: 16),
 
+              // ===== لماذا حصلت على هذه الفئة؟ =====
+              if (_data!['reasons'] != null && (_data!['reasons'] as List).isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('🔍 لماذا حصلت على هذه الفئة؟', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      const SizedBox(height: 10),
+                      ...List<String>.from(_data!['reasons']).map((r) => Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('• ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                Expanded(child: Text(r, style: const TextStyle(fontSize: 13))),
+                              ],
+                            ),
+                          )),
+                    ],
+                  ),
+                ),
+
+              // ===== كيف تصل إلى الفئة التالية؟ =====
+              if (_data!['tips'] != null && (_data!['tips'] as List).isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(color: Colors.green.withOpacity(0.06), borderRadius: BorderRadius.circular(16)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('🚀 كيف تصل إلى الفئة التالية؟', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      const SizedBox(height: 10),
+                      ...List<String>.from(_data!['tips']).map((t) => Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                                const SizedBox(width: 6),
+                                Expanded(child: Text(t, style: const TextStyle(fontSize: 13))),
+                              ],
+                            ),
+                          )),
+                    ],
+                  ),
+                ),
+
+              // ===== شريط التقدم للفئة التالية =====
+              if (_data!['progress'] != null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '🎯 يتبقى لك ${_data!['progress']['pointsNeeded']}% للانتقال إلى الفئة ${_data!['progress']['nextGrade']}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: (_data!['progress']['progressPercent'] as num) / 100,
+                          minHeight: 10,
+                          backgroundColor: Colors.grey.shade200,
+                          color: _solidColorFor(colorKey),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // ===== مقارنة مع التقرير السابق =====
+              if (_data!['comparison'] != null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: (_data!['comparison']['improved'] == true ? Colors.green : Colors.red).withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _data!['comparison']['improved'] == true ? Icons.trending_up : Icons.trending_down,
+                        color: _data!['comparison']['improved'] == true ? Colors.green : Colors.red,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        _data!['comparison']['improved'] == true
+                            ? 'تحسّن أداؤك بنسبة ${_data!['comparison']['diffPercent'].abs()}% مقارنة بالتقرير السابق'
+                            : 'تراجع أداؤك بنسبة ${_data!['comparison']['diffPercent'].abs()}% مقارنة بالتقرير السابق',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12.5,
+                          color: _data!['comparison']['improved'] == true ? Colors.green.shade800 : Colors.red.shade800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -295,6 +408,7 @@ class _PerformanceReportScreenState extends State<PerformanceReportScreen> with 
                 ),
               ],
 
+              // ===== قسم ملاحظات المندوب المرتبطة مباشرة بهذا التقرير =====
               const SizedBox(height: 24),
               Container(
                 width: double.infinity,

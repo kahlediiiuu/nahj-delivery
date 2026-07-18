@@ -101,6 +101,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (await canLaunchUrl(uri)) await launchUrl(uri);
   }
 
+  /// يتحقق من حالة الدوام الحقيقية المخزّنة في الخادم (وليس افتراض أنه "خارج الدوام" دائمًا
+  /// عند إعادة فتح التطبيق) - وإن كان لا يزال في وضع العمل، يعيد تشغيل خدمة التتبع تلقائيًا
+  /// (بدون طلب أي إجراء من المندوب) لضمان استمرارها حتى لو أُعيد فتح التطبيق من الصفر.
   Future<void> _syncShiftStatus() async {
     try {
       final result = await ApiService.getMyReport();
@@ -111,7 +114,9 @@ class _HomeScreenState extends State<HomeScreen> {
           await LocationService.start();
         } catch (_) {}
       }
-    } catch (_) {}
+    } catch (_) {
+      // إن فشل الفحص (لا إنترنت مثلاً)، اترك الحالة كما هي مؤقتًا وستُحدَّث لاحقًا
+    }
   }
 
   Future<void> _setupPushNotifications() async {
@@ -125,6 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ApiService.registerFcmToken(newToken);
       });
 
+      // إن وصل تنبيه والتطبيق مفتوح حاليًا، تحقق إن كان "إلزاميًا" ويطلب ردًا فوريًا
       FirebaseMessaging.onMessage.listen((message) {
         _refreshUnread();
         if (message.data['requiresResponse'] == 'true' && message.data['messageId'] != null) {
@@ -134,14 +140,16 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
       });
-    } catch (_) {}
+    } catch (_) {
+      // إن فشلت تهيئة الإشعارات لأي سبب، يستمر التطبيق بالعمل عاديًا بدونها فقط
+    }
   }
 
   void _showMandatoryResponseDialog(String messageId, String alertText) {
     final controller = TextEditingController();
     showDialog(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: false, // إلزامي: لا يمكن إغلاقه بدون الرد
       builder: (ctx) => PopScope(
         canPop: false,
         child: AlertDialog(
@@ -351,6 +359,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // ===== بطاقة الحضور الرئيسية (بديل الأيقونة الكبيرة السابقة) =====
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -412,6 +421,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 16),
 
+            // ===== بطاقة الفئة الحالية والإشعارات (بدل الساعات/الكيلومترات غير المفيدة سابقًا) =====
             if (_currentGrade.isNotEmpty)
               Container(
                 width: double.infinity,
@@ -442,6 +452,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 20),
 
+            // ===== شبكة الميزات =====
             GridView.count(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),

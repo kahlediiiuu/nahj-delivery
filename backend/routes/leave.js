@@ -5,6 +5,7 @@ const { verifyToken, requireAdmin } = require('../middleware/auth');
 
 router.use(verifyToken);
 
+// المندوب يقدّم طلب إجازة (سبب + تاريخ مطلوب + ملاحظة اختيارية)
 router.post('/', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -17,10 +18,10 @@ router.post('/', async (req, res) => {
 
     const docRef = await db.collection('leaveRequests').add({
       driverId: req.user.driverId,
-      reasonType,
+      reasonType, // 'sick' | 'emergency' | 'personal' | 'other'
       date,
       note: note || '',
-      status: 'pending',
+      status: 'pending', // pending | approved | rejected
       createdAt: Date.now(),
     });
 
@@ -31,11 +32,15 @@ router.post('/', async (req, res) => {
   }
 });
 
+// المندوب يشاهد طلباته السابقة فقط
 router.get('/my', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
       return res.status(403).json({ success: false, message: 'مسموح للمناديب فقط' });
     }
+    // ملاحظة: نتجنب .orderBy() هنا عمدًا لأن Firestore يتطلب "فهرسًا مركّبًا" (Composite Index)
+    // عند دمج where + orderBy على حقلين مختلفين، وإن لم يُنشَأ هذا الفهرس مسبقًا فالاستعلام يفشل بالكامل بصمت.
+    // الحل: نجلب البيانات ونرتّبها داخل الخادم مباشرة (آمن دائمًا، بدون أي إعداد إضافي مطلوب).
     const snap = await db
       .collection('leaveRequests')
       .where('driverId', '==', req.user.driverId)
@@ -63,9 +68,10 @@ router.get('/', requireAdmin, async (req, res) => {
   }
 });
 
+// المشرف: قبول أو رفض طلب إجازة
 router.patch('/:id', requireAdmin, async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status } = req.body; // 'approved' | 'rejected'
     if (!['approved', 'rejected'].includes(status)) {
       return res.status(400).json({ success: false, message: 'حالة غير صحيحة' });
     }

@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
+  // رابط الخادم الحقيقي (جاهز مسبقاً، لا حاجة لتعديله)
   static const String baseUrl = 'https://nahj-backend.onrender.com/api';
 
   static Future<String?> getToken() async {
@@ -32,9 +33,11 @@ class ApiService {
   }
 
   static const String _queueKey = 'pending_locations_queue';
-  static const int _maxQueueSize = 2000;
+  static const int _maxQueueSize = 2000; // حماية من امتلاء التخزين لو انقطع الإنترنت لساعات طويلة جداً
 
+  /// يحاول إرسال نقطة الموقع الحالية. إن فشل (لا إنترنت)، يخزّنها محلياً بدل فقدانها.
   static Future<bool> sendLocation(Map<String, dynamic> payload) async {
+    // أولاً: حاول تفريغ أي نقاط مؤجلة سابقة قبل إرسال النقطة الحالية
     await flushQueue();
 
     try {
@@ -56,6 +59,7 @@ class ApiService {
       await _enqueue(payload);
       return false;
     } catch (_) {
+      // فشل الإرسال (غالباً انقطاع إنترنت) - خزّن النقطة محلياً بدل فقدانها
       await _enqueue(payload);
       return false;
     }
@@ -68,12 +72,14 @@ class ApiService {
     withTimestamp['timestamp'] = DateTime.now().millisecondsSinceEpoch;
     list.add(jsonEncode(withTimestamp));
 
+    // منع الامتلاء اللانهائي: إن تجاوز الحد، احذف الأقدم
     while (list.length > _maxQueueSize) {
       list.removeAt(0);
     }
     await prefs.setStringList(_queueKey, list);
   }
 
+  /// يحاول إرسال كل النقاط المخزنة محلياً دفعة واحدة عبر /location/batch
   static Future<void> flushQueue() async {
     final prefs = await SharedPreferences.getInstance();
     final list = prefs.getStringList(_queueKey) ?? <String>[];
@@ -96,9 +102,12 @@ class ApiService {
           .timeout(const Duration(seconds: 15));
 
       if (res.statusCode == 200) {
-        await prefs.remove(_queueKey);
+        await prefs.remove(_queueKey); // نجح الإرسال، أفرغ الطابور
       }
-    } catch (_) {}
+      // إن فشل، تبقى النقاط في الطابور وتُحاول مجدداً في الدورة القادمة
+    } catch (_) {
+      // لا يزال لا يوجد إنترنت، اترك الطابور كما هو
+    }
   }
 
   static Future<int> pendingQueueCount() async {

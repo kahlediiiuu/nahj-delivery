@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="css/style.css">
 <style>
-  .tabs { display:flex; gap:8px; padding:10px 20px; background:#fff; border-bottom:1px solid #e2e8f0; flex-wrap:wrap; }
+  .tabs { display:flex; gap:8px; padding:10px 20px; background:#fff; border-bottom:1px solid #e2e8f0; }
   .tab-btn { padding:8px 16px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:8px; cursor:pointer; font-size:14px; }
   .tab-btn.active { background:#0f172a; color:#fff; border-color:#0f172a; }
   .tab-panel { display:none; padding:20px; }
@@ -49,6 +49,7 @@
     <div class="tab-btn" data-tab="dailynotes">📝 ملاحظات المناديب</div>
   </div>
 
+  <!-- تبويب إعادة التشغيل -->
   <div class="tab-panel active" id="tab-replay">
     <div class="controls-row">
       <select id="replayDriverSelect"><option>جاري التحميل...</option></select>
@@ -69,6 +70,7 @@
     <div id="replayMap"></div>
   </div>
 
+  <!-- تبويب لوحة الأداء -->
   <div class="tab-panel" id="tab-leaderboard">
     <div class="controls-row">
       <label>من: <input type="date" id="fromDate"></label>
@@ -91,6 +93,7 @@
     </table>
   </div>
 
+  <!-- تبويب تقرير التوصيلات اليومي -->
   <div class="tab-panel" id="tab-orders">
     <div class="controls-row">
       <button id="prevDayBtn">◀ اليوم السابق</button>
@@ -111,6 +114,7 @@
     </table>
   </div>
 
+  <!-- تبويب طلبات الإجازة -->
   <div class="tab-panel" id="tab-leave">
     <div class="controls-row">
       <select id="leaveStatusFilter">
@@ -131,6 +135,7 @@
     </table>
   </div>
 
+  <!-- تبويب سجل الغياب -->
   <div class="tab-panel" id="tab-absences">
     <div class="controls-row">
       <button id="prevAbsenceDayBtn">◀ اليوم السابق</button>

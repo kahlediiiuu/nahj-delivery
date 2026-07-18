@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const { db } = require('../config/firebase');
 const { verifyToken } = require('../middleware/auth');
 
+// المندوب يسجّل رمز جهازه (FCM Token) بعد تسجيل الدخول لتصله الإشعارات الحقيقية حتى مع إغلاق التطبيق
 router.post('/driver/fcm-token', verifyToken, async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -20,6 +21,7 @@ router.post('/driver/fcm-token', verifyToken, async (req, res) => {
   }
 });
 
+// المندوب يسجّل لغته المختارة داخل التطبيق - تُستخدم لاحقًا لإرسال الإشعارات الجماعية بلغته الصحيحة
 router.post('/driver/language', verifyToken, async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -37,6 +39,7 @@ router.post('/driver/language', verifyToken, async (req, res) => {
   }
 });
 
+// تسجيل دخول المشرف
 router.post('/admin/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -64,6 +67,7 @@ router.post('/admin/login', async (req, res) => {
   }
 });
 
+// تسجيل دخول المندوب (باستخدام رقم المندوب وكلمة المرور)
 router.post('/driver/login', async (req, res) => {
   try {
     const { driverCode, password } = req.body;
@@ -108,6 +112,7 @@ router.post('/driver/login', async (req, res) => {
   }
 });
 
+// تغيير كلمة مرور المشرف (يتطلب معرفة كلمة المرور الحالية أولاً)
 router.post('/admin/change-password', async (req, res) => {
   try {
     const jwt = require('jsonwebtoken');
@@ -154,6 +159,7 @@ router.post('/admin/change-password', async (req, res) => {
   }
 });
 
+// تغيير اسم المستخدم للمشرف
 router.post('/admin/change-username', async (req, res) => {
   try {
     const jwt = require('jsonwebtoken');
@@ -199,6 +205,7 @@ router.post('/admin/change-username', async (req, res) => {
   }
 });
 
+// إنشاء حساب مشرف إضافي (يتطلب تسجيل دخول كمشرف حالي)
 router.post('/admin/create', async (req, res) => {
   try {
     const jwt = require('jsonwebtoken');

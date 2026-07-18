@@ -85,6 +85,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
                 child: Center(child: Text('لا يوجد تقرير تشغيل لهذا اليوم بعد', style: TextStyle(color: Colors.grey, fontSize: 15))),
               )
             else ...[
+              // ===== بطاقة ساعات العمل الرئيسية =====
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(22),

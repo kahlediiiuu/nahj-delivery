@@ -7,6 +7,7 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
   window.location.href = 'login.html';
 });
 
+// ------- التبويبات -------
 document.querySelectorAll('.tab-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
@@ -16,6 +17,7 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
   });
 });
 
+// ------- تحميل قائمة المناديب -------
 let driversList = [];
 async function loadDriversList() {
   const res = await fetch(`${API_URL}/drivers`, { headers: { Authorization: `Bearer ${token}` } });
@@ -27,6 +29,7 @@ async function loadDriversList() {
   }
 }
 loadDriversList().then(() => {
+  // إن جاء المستخدم من رابط "متابعة مسار الحركة" في الخريطة، افتح تبويب المسار مباشرة واختر المندوب تلقائيًا
   const params = new URLSearchParams(window.location.search);
   const requestedDriverId = params.get('driverId');
   const requestedTab = params.get('tab');
@@ -47,9 +50,11 @@ loadDriversList().then(() => {
   }
 });
 
+// ================= إعادة تشغيل المسار (Replay) =================
 const replayMap = L.map('replayMap').setView([24.7136, 46.6753], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(replayMap);
 
+// توسيط الخريطة تلقائيًا على نطاق العمل الحقيقي المحفوظ (بدل الرياض الثابتة)
 (async function centerReplayMapOnWorkZone() {
   try {
     const res = await fetch(`${API_URL}/settings/workzone`, { headers: { Authorization: `Bearer ${token}` } });
@@ -128,6 +133,7 @@ document.getElementById('playBtn').addEventListener('click', () => {
 
 document.getElementById('pauseBtn').addEventListener('click', () => clearInterval(playInterval));
 
+// ================= لوحة الأداء والمقارنة =================
 const today = new Date().toISOString().slice(0, 10);
 const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
 document.getElementById('fromDate').value = weekAgo;
@@ -163,6 +169,7 @@ async function loadLeaderboard() {
 document.getElementById('loadLeaderboardBtn').addEventListener('click', loadLeaderboard);
 loadLeaderboard();
 
+// ------- التصدير -------
 document.getElementById('exportExcelBtn').addEventListener('click', () => {
   const rows = currentLeaderboard.map((d, i) => ({
     'الترتيب': i + 1,
@@ -179,10 +186,12 @@ document.getElementById('exportExcelBtn').addEventListener('click', () => {
   XLSX.writeFile(wb, `تقرير_الأداء_${document.getElementById('fromDate').value}_${document.getElementById('toDate').value}.xlsx`);
 });
 
+// تصدير PDF: نستخدم نافذة طباعة المتصفح (Ctrl+P → حفظ كـ PDF) - أبسط وأكثر موثوقية من مكتبات PDF الخارجية
 document.getElementById('exportPdfBtn').addEventListener('click', () => {
   window.print();
 });
 
+// ================= طلبات الإجازة =================
 let driversMap = {};
 function buildDriversMap() {
   driversMap = {};
@@ -227,17 +236,27 @@ async function loadLeaveRequests() {
 }
 
 window.decideLeave = async function (id, status) {
-  await fetch(`${API_URL}/leave/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ status }),
-  });
-  loadLeaveRequests();
+  try {
+    const res = await fetch(`${API_URL}/leave/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status }),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      loadLeaveRequests();
+    } else {
+      alert('❌ فشل تحديث حالة الإجازة: ' + (data.message || `رمز الخطأ ${res.status}`));
+    }
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم، لم يتم اعتماد القرار');
+  }
 };
 
 document.getElementById('loadLeaveBtn').addEventListener('click', loadLeaveRequests);
 document.getElementById('leaveStatusFilter').addEventListener('change', loadLeaveRequests);
 
+// ================= سجل الغياب =================
 document.getElementById('absenceDate').valueAsDate = new Date();
 
 async function loadAbsences() {
@@ -264,11 +283,19 @@ async function loadAbsences() {
 }
 
 window.saveAbsenceNote = async function (id, note) {
-  await fetch(`${API_URL}/performance/absences/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ note }),
-  });
+  try {
+    const res = await fetch(`${API_URL}/performance/absences/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ note }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      alert('❌ فشل حفظ الملاحظة: ' + (data.message || `رمز الخطأ ${res.status}`));
+    }
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم، لم تُحفظ الملاحظة');
+  }
 };
 
 document.getElementById('loadAbsencesBtn').addEventListener('click', loadAbsences);
@@ -287,6 +314,7 @@ document.getElementById('nextAbsenceDayBtn').addEventListener('click', () => {
   loadAbsences();
 });
 
+// تحميل أولي عند فتح أي من التبويبين لأول مرة
 document.querySelectorAll('.tab-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     if (btn.dataset.tab === 'leave') loadLeaveRequests();
@@ -294,6 +322,7 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
   });
 });
 
+// ================= ملاحظات المناديب اليومية =================
 const noteTypeLabels = {
   restaurant_closed: '🔒 المطعم مغلق',
   customer_no_response: '📵 العميل لا يرد',

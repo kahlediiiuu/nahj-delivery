@@ -14,11 +14,12 @@ function computeTotal(ranges) {
   return ranges.reduce((sum, r) => {
     const start = timeToMinutes(r.start);
     let end = timeToMinutes(r.end);
-    if (end < start) end += 24 * 60;
+    if (end < start) end += 24 * 60; // دعم فترة تمتد بعد منتصف الليل
     return sum + (end - start);
   }, 0);
 }
 
+// المندوب يضيف فترة عمل جديدة لليوم (مثال: 05:00 - 07:00) - لا علاقة لها إطلاقًا بتتبع الموقع
 router.post('/', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -54,6 +55,7 @@ router.post('/', async (req, res) => {
   }
 });
 
+// حذف فترة معيّنة من فترات ذلك اليوم
 router.delete('/:date/:index', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -76,6 +78,7 @@ router.delete('/:date/:index', async (req, res) => {
   }
 });
 
+// المندوب يشاهد فترات يوم معيّن
 router.get('/my', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -91,6 +94,7 @@ router.get('/my', async (req, res) => {
   }
 });
 
+// المندوب يشاهد سجل آخر 14 يومًا كإحصائية
 router.get('/my/history', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {

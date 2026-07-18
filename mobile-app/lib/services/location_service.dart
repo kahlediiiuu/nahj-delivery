@@ -7,6 +7,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 
+// رسائل مصنّفة حسب وقت اليوم ولغة المندوب - تُختار عشوائيًا دون تكرار السابقة مباشرة
 const Map<String, Map<String, List<String>>> _timedMessages = {
   'morning': {
     'ar': ['☀️ صباح الخير يا بطل', '🌅 نتمنى لك صباحًا مثمرًا', '☕ صباح النشاط والحيوية'],
@@ -42,10 +43,15 @@ String _pickMotivationalMessage(String lang) {
   return chosen;
 }
 
+/// خدمة التتبع الخلفي: تعمل حتى لو أُغلق التطبيق من الشاشة الأخيرة (على أندرويد،
+/// عبر Foreground Service بإشعار دائم يمنع النظام من قتل العملية).
 class LocationService {
   static Future<void> initialize() async {
     final service = FlutterBackgroundService();
 
+    // ⚠️ الخطوة الحاسمة: يجب إنشاء "قناة الإشعار" فعليًا قبل تشغيل الخدمة،
+    // وإلا يرفض نظام أندرويد عرض الإشعار ويوقف التطبيق بالكامل فورًا (على مستوى النظام،
+    // وهو ما لا يمكن لأي try/catch في Dart اعتراضه).
     const channel = AndroidNotificationChannel(
       'nahj_tracking_channel',
       'تتبع نهج للتوصيل',
@@ -66,7 +72,7 @@ class LocationService {
     await service.configure(
       androidConfiguration: AndroidConfiguration(
         onStart: onServiceStart,
-        autoStart: false,
+        autoStart: false, // يبدأ فقط بعد تسجيل الدخول وبدء الدوام
         isForegroundMode: true,
         notificationChannelId: 'nahj_tracking_channel',
         initialNotificationTitle: 'نهج للتوصيل',
@@ -118,6 +124,7 @@ Future<void> _runServiceLoop(ServiceInstance service) async {
     service.stopSelf();
   });
 
+  // إرسال نقطة كل 8 ثوانٍ (ضمن النطاق المطلوب 5-10 ثوانٍ)
   const interval = Duration(seconds: 8);
 
   Future<void> sendUpdate() async {
@@ -136,7 +143,7 @@ Future<void> _runServiceLoop(ServiceInstance service) async {
         );
         lat = position.latitude;
         lng = position.longitude;
-        speed = (position.speed * 3.6).clamp(0, 999);
+        speed = (position.speed * 3.6).clamp(0, 999); // م/ث -> كم/س
         accuracy = position.accuracy;
       }
 
@@ -174,6 +181,9 @@ Future<void> _runServiceLoop(ServiceInstance service) async {
           'gpsEnabled': true,
           'isInternetConnected': isConnected,
         });
+        // عند فشل الإرسال بسبب انقطاع مؤقت، سيُعاد إرسال أحدث نقطة تلقائياً
+        // في الدورة القادمة (كل 8 ثوانٍ) فور عودة الإنترنت - لا حاجة لطابور تخزين معقد
+        // لأن الفارق الزمني صغير جداً ولا يؤثر على دقة التتبع اللحظي.
       } else if (!gpsEnabled) {
         await ApiService.sendLocation({
           'lat': lat, 'lng': lng, 'speed': 0, 'accuracy': 0,
@@ -181,7 +191,9 @@ Future<void> _runServiceLoop(ServiceInstance service) async {
           'gpsEnabled': false, 'isInternetConnected': isConnected,
         });
       }
-    } catch (_) {}
+    } catch (_) {
+      // تجاهل الخطأ والمحاولة مجدداً في الدورة القادمة (يشمل انقطاع الإنترنت)
+    }
   }
 
   await sendUpdate();

@@ -1,6 +1,7 @@
 const token = sessionStorage.getItem('nahj_admin_token');
 if (!token) window.location.href = 'login.html';
 
+// ------- التبويبات -------
 document.querySelectorAll('.tab-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
@@ -17,6 +18,7 @@ function showMsg(elId, text, isError) {
   el.className = 'msg ' + (isError ? 'error' : 'success');
 }
 
+// ------- تغيير كلمة المرور -------
 document.getElementById('submitPasswordBtn').addEventListener('click', async () => {
   const currentPassword = document.getElementById('currentPassword').value;
   const newPassword = document.getElementById('newPassword').value;
@@ -45,6 +47,7 @@ document.getElementById('submitPasswordBtn').addEventListener('click', async () 
   }
 });
 
+// ------- تغيير اسم المستخدم -------
 document.getElementById('submitUsernameBtn').addEventListener('click', async () => {
   const currentPassword = document.getElementById('usernameCurrentPassword').value;
   const newUsername = document.getElementById('newUsername').value.trim();
@@ -68,6 +71,7 @@ document.getElementById('submitUsernameBtn').addEventListener('click', async () 
   }
 });
 
+// ------- إضافة مشرف جديد -------
 document.getElementById('submitNewAdminBtn').addEventListener('click', async () => {
   const name = document.getElementById('newAdminName').value.trim();
   const username = document.getElementById('newAdminUsername').value.trim();
@@ -95,6 +99,7 @@ document.getElementById('submitNewAdminBtn').addEventListener('click', async () 
   }
 });
 
+// ------- نطاق العمل + GPS -------
 const map = L.map('workzoneMap').setView([24.7136, 46.6753], 11);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
 
@@ -131,6 +136,7 @@ async function loadWorkzone() {
 }
 loadWorkzone();
 
+// زر "استخدم موقعي الحالي" - يعمل على الكمبيوتر (بدقة تقريبية عبر IP/شبكة) والجوال (بدقة GPS حقيقية)
 document.getElementById('useMyLocationBtn').addEventListener('click', () => {
   const msg = document.getElementById('workzoneMsg');
   if (!navigator.geolocation) {
@@ -175,6 +181,7 @@ document.getElementById('saveWorkzoneBtn').addEventListener('click', async () =>
   }
 });
 
+// ------- التواصل مع المناديب -------
 async function loadContactInfo() {
   try {
     const res = await fetch(`${NAHJ_API_URL}/settings/contact`, { headers: { Authorization: `Bearer ${token}` } });

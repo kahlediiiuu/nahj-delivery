@@ -1,7 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// نظام ترجمة مبسّط جداً (بدون أدوات بناء معقدة قد تفشل عند التثبيت).
+/// كل مندوب يختار لغته من شاشة الدخول أول مرة، وتُحفظ في جهازه فقط.
 class AppStrings {
+  // ValueNotifier يجعل الواجهة تتحدث فوراً عند تغيير اللغة، بدون إعادة تشغيل التطبيق
   static final ValueNotifier<String> languageNotifier = ValueNotifier('ar');
   static String get currentLang => languageNotifier.value;
 

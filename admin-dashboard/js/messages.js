@@ -112,31 +112,58 @@ document.getElementById('chatSearchInput')?.addEventListener('input', (e) => {
 window.deleteWholeConversation = async function () {
   if (!currentDriverId) return;
   if (!confirm('هل أنت متأكد من حذف كامل المحادثة مع هذا المندوب نهائيًا؟ لا يمكن التراجع.')) return;
-  await fetch(`${NAHJ_API_URL}/messages/driver/${currentDriverId}/all`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  currentMessages = [];
-  renderMessages([]);
-  loadConversations();
-  alert('تم حذف المحادثة بالكامل.');
+  try {
+    const res = await fetch(`${NAHJ_API_URL}/messages/driver/${currentDriverId}/all`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      currentMessages = [];
+      renderMessages([]);
+      loadConversations();
+      alert('✅ تم حذف المحادثة بالكامل.');
+    } else {
+      alert('❌ فشل الحذف: ' + (data.message || 'خطأ غير معروف'));
+    }
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم');
+  }
 };
 
 window.deleteMessage = async function (messageId) {
   if (!confirm('حذف هذه الرسالة نهائياً من السجل؟')) return;
-  await fetch(`${NAHJ_API_URL}/messages/${messageId}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  await loadMessages();
+  try {
+    const res = await fetch(`${NAHJ_API_URL}/messages/${messageId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      await loadMessages();
+    } else {
+      alert('❌ فشل الحذف: ' + (data.message || 'خطأ غير معروف'));
+    }
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم');
+  }
 };
 
 window.resendMessage = async function (messageId) {
-  await fetch(`${NAHJ_API_URL}/messages/${messageId}/resend`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  alert('تمت إعادة إرسال الإشعار بنجاح');
+  try {
+    const res = await fetch(`${NAHJ_API_URL}/messages/${messageId}/resend`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      alert('✅ تمت إعادة إرسال الإشعار بنجاح');
+    } else {
+      alert('❌ فشلت إعادة الإرسال: ' + (data.message || 'خطأ غير معروف'));
+    }
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم');
+  }
 };
 
 document.getElementById('sendBtn').addEventListener('click', () => sendMessage());
@@ -144,6 +171,7 @@ document.getElementById('messageInput').addEventListener('keypress', (e) => {
   if (e.key === 'Enter') sendMessage();
 });
 
+// ================= إرسال ملف مرفق للمندوب =================
 document.getElementById('attachBtn')?.addEventListener('click', () => {
   document.getElementById('attachFileInput').click();
 });
@@ -199,11 +227,23 @@ async function sendMessage(presetText) {
   if (!text || !currentDriverId) return;
 
   input.value = '';
-  await fetch(`${NAHJ_API_URL}/messages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ driverId: currentDriverId, text }),
-  });
+  try {
+    const res = await fetch(`${NAHJ_API_URL}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ driverId: currentDriverId, text }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      alert('❌ فشل إرسال الرسالة: ' + (data.message || 'خطأ غير معروف'));
+      input.value = text; // أعد النص للمربع حتى لا يفقده المشرف
+      return;
+    }
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم، الرسالة لم تُرسَل');
+    input.value = text;
+    return;
+  }
   await loadMessages();
   await loadConversations();
 }

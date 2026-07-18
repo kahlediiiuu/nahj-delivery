@@ -12,9 +12,12 @@ import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/permission_gate_screen.dart';
 
+// يجب أن تكون دالة مستقلة على المستوى الأعلى (وليست داخل كلاس) ليستطيع نظام
+// أندرويد استدعاءها حتى لو كان التطبيق مغلقًا تمامًا وقت وصول الإشعار.
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // لا حاجة لأي كود هنا: نظام أندرويد نفسه يعرض الإشعار تلقائيًا
+  // لا حاجة لأي كود هنا: نظام أندرويد نفسه يعرض الإشعار تلقائيًا من حقل
+  // "notification" الذي يرسله الخادم، حتى مع إغلاق التطبيق بالكامل.
 }
 
 Future<void> main() async {
@@ -54,7 +57,9 @@ Future<void> _saveCrashLog(String message) async {
     final prefs = await SharedPreferences.getInstance();
     final time = DateTime.now().toIso8601String();
     await prefs.setString('last_crash_log', '[$time]\n$message');
-  } catch (_) {}
+  } catch (_) {
+    // لا شيء يمكن فعله إن فشل حتى التسجيل نفسه
+  }
 }
 
 class NahjDeliveryApp extends StatelessWidget {
@@ -94,6 +99,7 @@ class NahjDeliveryApp extends StatelessWidget {
   }
 }
 
+/// يتحقق إن كان هناك جلسة محفوظة مسبقاً وينقل المستخدم للشاشة المناسبة
 class _StartupRouter extends StatelessWidget {
   const _StartupRouter();
 

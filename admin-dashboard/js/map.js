@@ -1,3 +1,4 @@
+// إدارة خريطة OpenStreetMap عبر Leaflet وعلامات المناديب
 const map = L.map('map').setView([24.7136, 46.6753], 11);
 
 (async function centerOnRealWorkZone() {
@@ -13,6 +14,7 @@ const map = L.map('map').setView([24.7136, 46.6753], 11);
   } catch (_) {}
 })();
 
+// ===== طبقتا الخريطة: عادية وقمر صناعي =====
 const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
   maxZoom: 19,
@@ -24,8 +26,8 @@ const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/
 streetLayer.addTo(map);
 let isSatellite = false;
 
-const markers = {};
-window.followedDriverId = null;
+const markers = {}; // driverId -> L.marker
+window.followedDriverId = null; // المندوب الذي تُتابعه الخريطة تلقائيًا حاليًا (أو null)
 
 function statusColor(loc) {
   const now = Date.now();
@@ -136,6 +138,7 @@ function updateMarkers(locations, driversInfo) {
     }
   }
 
+  // عند أول تحميل فقط: وسّع الخريطة تلقائيًا لتشمل كل المناديب مهما تباعدوا (بدون إزعاج التنقل اليدوي لاحقًا)
   if (isFirstLoad && Object.keys(markers).length > 1) {
     const bounds = L.latLngBounds(Object.values(markers).map((m) => m.getLatLng()));
     map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
@@ -144,6 +147,7 @@ function updateMarkers(locations, driversInfo) {
   toggleNameLabelsVisibility();
 }
 
+// أسماء المناديب تظهر فقط عند تكبير كافٍ (لتفادي ازدحام بصري عند التصغير)
 function toggleNameLabelsVisibility() {
   const shouldShow = map.getZoom() >= 13;
   document.querySelectorAll('.driver-name-label').forEach((el) => {
@@ -158,6 +162,7 @@ setInterval(() => {
   }
 }, 15000);
 
+// ===== زر تبديل نوع الخريطة (عادية / قمر صناعي) =====
 const layerControl = L.control({ position: 'topleft' });
 layerControl.onAdd = function () {
   const btn = L.DomUtil.create('button', 'layer-toggle-btn');
@@ -181,6 +186,7 @@ layerControl.onAdd = function () {
 };
 layerControl.addTo(map);
 
+// ===== زر "تحديد موقعي الحالي" =====
 const locateControl = L.control({ position: 'topleft' });
 locateControl.onAdd = function () {
   const btn = L.DomUtil.create('button', 'locate-me-btn');
@@ -199,6 +205,7 @@ locateControl.onAdd = function () {
 };
 locateControl.addTo(map);
 
+// ===== زر "تحديث الآن" =====
 const refreshControl = L.control({ position: 'topleft' });
 refreshControl.onAdd = function () {
   const btn = L.DomUtil.create('button', 'refresh-now-btn');

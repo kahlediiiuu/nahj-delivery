@@ -8,6 +8,7 @@ router.use(verifyToken);
 
 const MAX_ATTACHMENT_SIZE = 700 * 1024;
 
+// المشرف ينشر خبرًا/تعليمة/إعلانًا جديدًا - يصل إشعار فوري لكل المناديب النشطين
 router.post('/', requireAdmin, async (req, res) => {
   try {
     const { title, body, attachmentData, attachmentType } = req.body;
@@ -29,6 +30,7 @@ router.post('/', requireAdmin, async (req, res) => {
       createdAt: Date.now(),
     });
 
+    // إشعار فوري لكل المناديب النشطين
     const driversSnap = await db.collection('drivers').where('status', '==', 'active').get();
     await Promise.all(
       driversSnap.docs.map((d) => sendPushToDriver(d.id, `📢 ${title}`, body, { announcementId: docRef.id }))
@@ -41,6 +43,7 @@ router.post('/', requireAdmin, async (req, res) => {
   }
 });
 
+// الجميع (مندوب أو مشرف): عرض كل الأخبار/التعليمات/الإعلانات
 router.get('/', async (req, res) => {
   try {
     const snap = await db.collection('announcements').orderBy('createdAt', 'desc').limit(100).get();
@@ -51,6 +54,7 @@ router.get('/', async (req, res) => {
   }
 });
 
+// المشرف: حذف إعلان
 router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     await db.collection('announcements').doc(req.params.id).delete();
@@ -61,6 +65,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
   }
 });
 
+// المندوب: إرسال ملاحظة/استفسار عن إعلان معيّن (مع صورة اختيارية)
 router.post('/:id/notes', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -94,6 +99,7 @@ router.post('/:id/notes', async (req, res) => {
   }
 });
 
+// المشرف: عرض كل الملاحظات على إعلان معيّن
 router.get('/:id/notes', requireAdmin, async (req, res) => {
   try {
     const snap = await db
@@ -110,6 +116,7 @@ router.get('/:id/notes', requireAdmin, async (req, res) => {
   }
 });
 
+// المشرف: عرض كل الملاحظات الحديثة على كل الإعلانات (نظرة عامة سريعة)
 router.get('/notes/all', requireAdmin, async (req, res) => {
   try {
     const snap = await db.collection('announcementNotes').orderBy('createdAt', 'desc').limit(100).get();

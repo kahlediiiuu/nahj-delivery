@@ -163,7 +163,7 @@ async function checkResponse(res) {
 
 window.suspendDriver = async function (id) {
   const reason = prompt('سبب الإيقاف (اختياري، سيظهر للمندوب إن حاول الدخول):', '');
-  if (reason === null) return;
+  if (reason === null) return; // ضغط "إلغاء"
   try {
     const res = await fetch(`${API_URL}/drivers/${id}/suspend`, {
       method: 'PATCH',

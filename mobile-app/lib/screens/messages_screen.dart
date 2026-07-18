@@ -56,13 +56,22 @@ class _MessagesScreenState extends State<MessagesScreen> {
     if (text.isEmpty) return;
     _controller.clear();
     try {
-      await ApiService.sendMessage(text);
+      final ok = await ApiService.sendMessage(text);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('❌ فشل إرسال الرسالة، حاول مجددًا'), backgroundColor: Colors.red),
+        );
+        _controller.text = text; // أعد النص حتى لا يفقده المندوب
+        return;
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(AppStrings.get('connectionError')), backgroundColor: Colors.red),
         );
       }
+      _controller.text = text;
+      return;
     }
     _load();
   }
@@ -169,7 +178,12 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   ),
                 );
                 if (confirm == true) {
-                  await ApiService.deleteAllMyMessages();
+                  final ok = await ApiService.deleteAllMyMessages();
+                  if (!ok && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('❌ فشل حذف الرسائل'), backgroundColor: Colors.red),
+                    );
+                  }
                   _load();
                 }
               },
@@ -203,7 +217,12 @@ class _MessagesScreenState extends State<MessagesScreen> {
                                 ),
                               );
                               if (confirm == true) {
-                                await ApiService.deleteMessage(m['id']);
+                                final ok = await ApiService.deleteMessage(m['id']);
+                                if (!ok && mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('❌ فشل حذف الرسالة'), backgroundColor: Colors.red),
+                                  );
+                                }
                                 _load();
                               }
                             },

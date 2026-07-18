@@ -6,8 +6,15 @@ const { sendPushToDriver } = require('../utils/push');
 
 router.use(verifyToken);
 
+// حد أقصى آمن للبقاء ضمن حد حجم مستند Firestore (1 ميجابايت) بعد إضافة النص المُرمَّز base64
 const MAX_FILE_SIZE = 700 * 1024;
 
+/**
+ * رفع ملف (صورة أو PDF صغير) وتخزينه مباشرة داخل الرسالة نفسها في قاعدة البيانات
+ * (بدون الحاجة لخدمة تخزين سحابي منفصلة مدفوعة - يبقى المشروع مجانيًا بالكامل):
+ * - إن كان المرسل مندوبًا: يصل الملف للإدارة (يظهر في محادثته بلوحة التحكم).
+ * - إن كان المرسل مشرفًا: يجب تحديد driverId ليصل الملف لذلك المندوب تحديدًا.
+ */
 router.post('/', async (req, res) => {
   try {
     const { fileBase64, fileName, mimeType, caption, driverId: bodyDriverId, requiresResponse } = req.body;
@@ -37,7 +44,7 @@ router.post('/', async (req, res) => {
       driverId,
       sender,
       text: caption || (sender === 'admin' ? '📎 ملف مرفق من الإدارة' : '📎 ملف مرفق من المندوب'),
-      attachmentData: fileBase64,
+      attachmentData: fileBase64, // الملف نفسه مخزَّن هنا مباشرة (Base64) بدل رابط خارجي
       attachmentType: mimeType || '',
       attachmentName: fileName,
       createdAt: now,

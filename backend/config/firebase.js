@@ -1,5 +1,6 @@
 const admin = require('firebase-admin');
 
+// يدعم طريقتين: متغيرات بيئة منفصلة، أو ملف serviceAccountKey.json مباشر
 let credential;
 
 if (process.env.FIREBASE_PRIVATE_KEY) {
@@ -9,6 +10,7 @@ if (process.env.FIREBASE_PRIVATE_KEY) {
     privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
   });
 } else {
+  // بديل: ضع ملف serviceAccountKey.json في مجلد backend/config
   credential = admin.credential.cert(require('./serviceAccountKey.json'));
 }
 

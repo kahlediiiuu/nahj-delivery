@@ -3,6 +3,7 @@ const router = express.Router();
 const { db } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 
+// جلب إعدادات نطاق العمل الحالية (للمشرف فقط)
 router.get('/workzone', verifyToken, requireAdmin, async (req, res) => {
   try {
     const doc = await db.collection('settings').doc('workzone').get();
@@ -23,6 +24,7 @@ router.get('/workzone', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
+// تحديث إعدادات نطاق العمل من لوحة التحكم (للمشرف فقط)
 router.put('/workzone', verifyToken, requireAdmin, async (req, res) => {
   try {
     const { lat, lng, radiusMeters } = req.body;
@@ -39,6 +41,7 @@ router.put('/workzone', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
+// المشرف يضبط رقم واتساب/هاتف التواصل الذي يظهر للمناديب
 router.put('/contact', verifyToken, requireAdmin, async (req, res) => {
   try {
     const { whatsappNumber, phoneNumber } = req.body;
@@ -54,6 +57,7 @@ router.put('/contact', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
+// أي مستخدم مسجَّل دخول (مشرف أو مندوب) يستطيع قراءة رقم التواصل لعرضه في واجهته
 router.get('/contact', verifyToken, async (req, res) => {
   try {
     const doc = await db.collection('settings').doc('contact').get();

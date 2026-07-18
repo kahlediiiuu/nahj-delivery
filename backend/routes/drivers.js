@@ -4,8 +4,10 @@ const bcrypt = require('bcryptjs');
 const { db } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 
+// كل مسارات هذا الملف للمشرف فقط
 router.use(verifyToken, requireAdmin);
 
+// جلب كل المناديب (مع فلترة وبحث اختياريين)
 router.get('/', async (req, res) => {
   try {
     const { search, status } = req.query;
@@ -32,6 +34,7 @@ router.get('/', async (req, res) => {
   }
 });
 
+// إضافة مندوب جديد
 router.post('/', async (req, res) => {
   try {
     const { name, phone, driverCode, password } = req.body;
@@ -62,13 +65,15 @@ router.post('/', async (req, res) => {
   }
 });
 
+// تعديل بيانات مندوب
 router.put('/:id', async (req, res) => {
   try {
-    const { name, phone, matchCode } = req.body;
+    const { name, phone, matchCode, city } = req.body;
     const updates = {};
     if (name) updates.name = name;
     if (phone) updates.phone = phone;
     if (matchCode !== undefined) updates.matchCode = matchCode;
+    if (city !== undefined) updates.city = city;
     await db.collection('drivers').doc(req.params.id).update(updates);
     res.json({ success: true });
   } catch (err) {
@@ -77,6 +82,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// إيقاف الحساب (مع سبب اختياري يُسجَّل)
 router.patch('/:id/suspend', async (req, res) => {
   const { reason } = req.body;
   await db.collection('drivers').doc(req.params.id).update({
@@ -87,6 +93,7 @@ router.patch('/:id/suspend', async (req, res) => {
   res.json({ success: true });
 });
 
+// إعادة التفعيل
 router.patch('/:id/activate', async (req, res) => {
   await db.collection('drivers').doc(req.params.id).update({
     status: 'active',
@@ -95,18 +102,21 @@ router.patch('/:id/activate', async (req, res) => {
   res.json({ success: true });
 });
 
+// تعطيل/تفعيل قدرة المندوب على تسجيل الدخول (منفصل عن الإيقاف الكامل)
 router.patch('/:id/toggle-login', async (req, res) => {
   const { disableLogin } = req.body;
   await db.collection('drivers').doc(req.params.id).update({ disableLogin: !!disableLogin });
   res.json({ success: true });
 });
 
+// إخفاء/إظهار التقارير عن المندوب (يظل بإمكانه الدخول لكن لا يرى تقاريره)
 router.patch('/:id/toggle-reports', async (req, res) => {
   const { hideReports } = req.body;
   await db.collection('drivers').doc(req.params.id).update({ hideReports: !!hideReports });
   res.json({ success: true });
 });
 
+// حذف مندوب نهائياً
 router.delete('/:id', async (req, res) => {
   await db.collection('drivers').doc(req.params.id).delete();
   res.json({ success: true });

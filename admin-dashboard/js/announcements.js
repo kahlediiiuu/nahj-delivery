@@ -100,8 +100,17 @@ async function loadAnnouncements() {
 
 window.deleteAnnouncement = async function (id) {
   if (!confirm('حذف هذا الإعلان نهائيًا؟')) return;
-  await fetch(`${NAHJ_API_URL}/announcements/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-  loadAnnouncements();
+  try {
+    const res = await fetch(`${NAHJ_API_URL}/announcements/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      loadAnnouncements();
+    } else {
+      alert('❌ فشل الحذف: ' + (data.message || 'خطأ غير معروف'));
+    }
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم');
+  }
 };
 
 window.toggleNotes = async function (announcementId) {

@@ -3,6 +3,7 @@ const router = express.Router();
 const { db } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 
+// الفئات الحقيقية المستخدمة فعليًا في ملف التقرير اليومي (وليست A/B/C/D الافتراضية)
 const gradeInfo = {
   A: { emoji: '👑', label: 'نخبة متميزة (A)', color: 'gold' },
   B: { emoji: '🥈', label: 'أداء جيد جدًا (B)', color: 'silver' },
@@ -12,6 +13,7 @@ const gradeInfo = {
   F: { emoji: '⚠️', label: 'قائمة الخطر (F)', color: 'red' },
 };
 
+// المشرف يرفع تقرير الأداء اليومي (بعد استخراجه من ملف Excel في المتصفح)
 router.post('/upload', verifyToken, requireAdmin, async (req, res) => {
   try {
     const { date, records, confirmReplace } = req.body;
@@ -19,6 +21,7 @@ router.post('/upload', verifyToken, requireAdmin, async (req, res) => {
       return res.status(400).json({ success: false, message: 'بيانات غير صالحة' });
     }
 
+    // فحص التكرار: هل يوجد تقرير مرفوع مسبقًا لهذا اليوم بالذات؟ (نتحقق من أول مندوب في القائمة كمؤشر سريع)
     if (!confirmReplace) {
       const existingSnap = await db.collection('dailyPerformance').where('date', '==', date).limit(1).get();
       if (!existingSnap.empty) {
@@ -44,6 +47,7 @@ router.post('/upload', verifyToken, requireAdmin, async (req, res) => {
         onTimeDeliveryScore: r.onTimeDeliveryScore || 0,
         verificationSuccessRate: r.verificationSuccessRate || 0,
         finalQualityScore: r.finalQualityScore || 0,
+        // إبقاء الحقول القديمة أيضًا للتوافق مع أي كود سابق يقرأها
         ordersAccepted: r.completedOrders || 0,
         ordersRejected: r.failedOrders || 0,
         verificationCount: r.totalVerificationRequests || 0,
@@ -57,6 +61,7 @@ router.post('/upload', verifyToken, requireAdmin, async (req, res) => {
 
     await Promise.all(batchWrites);
 
+    // إشعار تلقائي فوري لكل مندوب بأن تقريره جاهز - فقط في أول رفع، وليس عند الاستبدال (تحديث صامت كما طُلب)
     if (!confirmReplace) {
       const notifyWrites = records.map((r) => {
         if (!r.driverId) return null;
@@ -76,6 +81,7 @@ router.post('/upload', verifyToken, requireAdmin, async (req, res) => {
       await Promise.all(notifyWrites);
     }
 
+    // كشف الغياب التلقائي: أي مندوب نشط لم يرد اسمه إطلاقًا في هذا الملف يُسجَّل كغائب لهذا اليوم
     const allDriversSnap = await db.collection('drivers').where('status', '==', 'active').get();
     const presentIds = new Set(records.filter((r) => r.driverId).map((r) => r.driverId));
     const absentWrites = allDriversSnap.docs
@@ -97,6 +103,7 @@ router.post('/upload', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
+// المشرف يستعرض تقارير يوم معيّن لكل المناديب (لمراجعتها بعد الرفع)
 router.get('/day', verifyToken, requireAdmin, async (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().slice(0, 10);
@@ -109,6 +116,8 @@ router.get('/day', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
+// المندوب يستعرض تقرير أدائه الخاص ليوم معيّن
+// حدود درجة الجودة النهائية (0-1) لكل فئة، تُستخدم لحساب "المتبقي للفئة التالية"
 const gradeThresholds = [
   { grade: 'A', min: 0.90 },
   { grade: 'B', min: 0.75 },
@@ -118,6 +127,7 @@ const gradeThresholds = [
   { grade: 'F', min: 0 },
 ];
 
+// يحلّل بيانات التقرير ويستخرج أسباب الفئة الحالية تلقائيًا (بدون أي إدخال يدوي من المشرف)
 function analyzeReasons(d) {
   const reasons = [];
   const tips = [];
@@ -147,10 +157,11 @@ function analyzeReasons(d) {
   return { reasons, tips };
 }
 
+// يحسب المسافة المتبقية للوصول للفئة التالية الأعلى
 function computeProgress(finalQualityScore) {
   const score = finalQualityScore || 0;
   const currentIndex = gradeThresholds.findIndex((g) => score >= g.min);
-  if (currentIndex <= 0) return null;
+  if (currentIndex <= 0) return null; // بالفعل في أعلى فئة (A) أو بيانات غير كافية
   const nextGrade = gradeThresholds[currentIndex - 1];
   const currentGrade = gradeThresholds[currentIndex];
   const pointsNeeded = Math.max(0, nextGrade.min - score);
@@ -158,7 +169,7 @@ function computeProgress(finalQualityScore) {
   const progressWithinRange = rangeSize > 0 ? (score - currentGrade.min) / rangeSize : 0;
   return {
     nextGrade: nextGrade.grade,
-    pointsNeeded: +(pointsNeeded * 100).toFixed(1),
+    pointsNeeded: +(pointsNeeded * 100).toFixed(1), // كنسبة مئوية لسهولة الفهم
     progressPercent: Math.max(0, Math.min(100, +(progressWithinRange * 100).toFixed(0))),
   };
 }
@@ -183,6 +194,7 @@ router.get('/my', verifyToken, async (req, res) => {
     const { reasons, tips } = analyzeReasons(d);
     const progress = computeProgress(d.finalQualityScore);
 
+    // مقارنة مع التقرير السابق (أمس بالنسبة لهذا التاريخ) لحساب نسبة التحسن/التراجع
     let comparison = null;
     try {
       const prevDate = new Date(new Date(date).getTime() - 86400000).toISOString().slice(0, 10);
@@ -211,6 +223,7 @@ router.get('/my', verifyToken, async (req, res) => {
   }
 });
 
+// المشرف: عرض قائمة الغائبين ليوم محدد
 router.get('/absences', verifyToken, requireAdmin, async (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().slice(0, 10);
@@ -222,6 +235,7 @@ router.get('/absences', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
+// المشرف: إضافة ملاحظة/سبب غياب (يجب تسجيله قبل المسار العام أدناه لتفادي التقاطه بالخطأ)
 router.patch('/absences/:id', verifyToken, requireAdmin, async (req, res) => {
   try {
     const { note } = req.body;
@@ -233,6 +247,7 @@ router.patch('/absences/:id', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
+// المشرف: تعديل أي حقل في تقرير أداء يوم معيّن لمندوب (بعد الرفع)
 router.patch('/:driverId/:date', verifyToken, requireAdmin, async (req, res) => {
   try {
     const { driverId, date } = req.params;
@@ -249,6 +264,10 @@ router.patch('/:driverId/:date', verifyToken, requireAdmin, async (req, res) => 
   }
 });
 
+// ================= ملاحظات مرتبطة مباشرة بتقرير أداء يوم معيّن =================
+// (منفصلة عن نظام الرسائل العام، لأنها مرتبطة بسياق تقرير محدد وليست محادثة عامة)
+
+// المندوب يضيف تعليقًا/استفسارًا/شكوى على تقريره لهذا اليوم
 router.post('/:driverId/:date/comments', verifyToken, async (req, res) => {
   try {
     const { driverId, date } = req.params;
@@ -275,6 +294,7 @@ router.post('/:driverId/:date/comments', verifyToken, async (req, res) => {
   }
 });
 
+// المشرف يردّ على تعليق المندوب (اختياريًا يجعل الرد إلزاميًا يتطلب ردًا من المندوب)
 router.post('/comments/:commentId/reply', verifyToken, requireAdmin, async (req, res) => {
   try {
     const { text, requiresResponse } = req.body;
@@ -305,6 +325,7 @@ router.post('/comments/:commentId/reply', verifyToken, requireAdmin, async (req,
   }
 });
 
+// المشرف: تعديل رد سابق
 router.patch('/comments/:commentId', verifyToken, requireAdmin, async (req, res) => {
   try {
     const { response } = req.body;
@@ -316,6 +337,7 @@ router.patch('/comments/:commentId', verifyToken, requireAdmin, async (req, res)
   }
 });
 
+// المشرف: حذف تعليق/رد
 router.delete('/comments/:commentId', verifyToken, requireAdmin, async (req, res) => {
   try {
     await db.collection('reportComments').doc(req.params.commentId).delete();
@@ -326,6 +348,7 @@ router.delete('/comments/:commentId', verifyToken, requireAdmin, async (req, res
   }
 });
 
+// جلب كل التعليقات المرتبطة بتقرير مندوب ليوم معيّن (للمندوب صاحب التقرير أو المشرف)
 router.get('/:driverId/:date/comments', verifyToken, async (req, res) => {
   try {
     const { driverId, date } = req.params;

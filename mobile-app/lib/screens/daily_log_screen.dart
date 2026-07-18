@@ -37,8 +37,8 @@ class _DailyLogScreenState extends State<DailyLogScreen> {
       } else {
         setState(() => _error = result['message'] ?? AppStrings.get('connectionError'));
       }
-    } catch (_) {
-      setState(() => _error = AppStrings.get('connectionError'));
+    } catch (e) {
+      setState(() => _error = 'خطأ: $e');
     } finally {
       setState(() => _loading = false);
     }
@@ -61,14 +61,11 @@ class _DailyLogScreenState extends State<DailyLogScreen> {
       ),
     );
     if (confirm == true) {
-      try {
-        await ApiService.deleteOrder(id);
-      } catch (_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(AppStrings.get('connectionError')), backgroundColor: Colors.red),
-          );
-        }
+      final ok = await ApiService.deleteOrder(id);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('❌ فشل حذف السجل'), backgroundColor: Colors.red),
+        );
       }
       _load();
     }
@@ -90,6 +87,7 @@ class _DailyLogScreenState extends State<DailyLogScreen> {
       appBar: AppBar(title: Text(AppStrings.get('dailyLog'))),
       body: Column(
         children: [
+          // شريط التنقل بين الأيام
           Container(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
             child: Row(
@@ -101,6 +99,7 @@ class _DailyLogScreenState extends State<DailyLogScreen> {
               ],
             ),
           ),
+          // ملخص اليوم
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -118,16 +117,7 @@ class _DailyLogScreenState extends State<DailyLogScreen> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(_error!, style: const TextStyle(color: Colors.red)),
-                            const SizedBox(height: 10),
-                            TextButton(onPressed: _load, child: const Text('إعادة المحاولة')),
-                          ],
-                        ),
-                      )
+                    ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
                     : _orders.isEmpty
                         ? Center(child: Text(AppStrings.get('noDeliveriesToday'), style: const TextStyle(color: Colors.grey)))
                         : ListView.builder(
@@ -215,11 +205,11 @@ class _AddDeliverySheetState extends State<_AddDeliverySheet> {
       if (result['success'] == true) {
         if (mounted) Navigator.pop(context, true);
       } else {
-        setState(() => _submitError = result['message'] ?? AppStrings.get('connectionError'));
+        setState(() => _submitError = result['message'] ?? 'فشل الحفظ، حاول مجددًا');
       }
     } catch (_) {
-      // هذا يعالج بالضبط مشكلة "الزر يعلّق عند انقطاع الاتصال" - الآن يظهر خطأ واضح بدل التعليق للأبد
-      setState(() => _submitError = AppStrings.get('connectionError'));
+      // هذا يمنع تعليق الزر للأبد عند انقطاع الاتصال - يظهر خطأ واضح بدل التعليق الصامت
+      setState(() => _submitError = 'تعذّر الاتصال بالخادم، تحقق من الإنترنت وحاول مجددًا');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -286,9 +276,7 @@ class _AddDeliverySheetState extends State<_AddDeliverySheet> {
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: _saving ? null : _submit,
-            child: _saving
-                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : Text(AppStrings.get('save')),
+            child: _saving ? const CircularProgressIndicator() : Text(AppStrings.get('save')),
           ),
         ],
       ),

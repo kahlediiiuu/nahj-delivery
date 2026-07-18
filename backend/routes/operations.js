@@ -6,6 +6,14 @@ const { sendPushToDriver } = require('../utils/push');
 
 router.use(verifyToken);
 
+/**
+ * تقرير التشغيل مستقل تمامًا عن تقرير الأداء (A-F). يُحفَظ كل عمود من ملف Excel الأصلي
+ * كما هو (بدون حذف أي بيانات) في dailyOperations، لكن عند عرضه للمندوب نُرسل فقط
+ * الحقول المفيدة له (ساعات العمل، الحضور، نسبة القبول...) ونُخفي البيانات الفنية/الإدارية
+ * (TGA، رموز الأخطاء، رقم الدفعة، المركبة، العقد) التي تبقى متاحة للمشرف فقط.
+ */
+
+// المشرف يرفع تقرير التشغيل (بعد استخراجه من Excel في المتصفح، بنفس منطق تقرير الأداء)
 router.post('/upload', requireAdmin, async (req, res) => {
   try {
     const { date, records, confirmReplace } = req.body;
@@ -29,6 +37,7 @@ router.post('/upload', requireAdmin, async (req, res) => {
       return db.collection('dailyOperations').doc(`${r.driverId}_${date}`).set({
         driverId: r.driverId,
         date,
+        // كل الأعمدة الأصلية محفوظة كاملة بدون استثناء لعرضها في لوحة الإشراف
         city: r.city || '',
         contractName: r.contractName || '',
         vehicleName: r.vehicleName || '',
@@ -79,6 +88,7 @@ router.post('/upload', requireAdmin, async (req, res) => {
   }
 });
 
+// المندوب: عرض تقرير تشغيله - نُرسل فقط الحقول المفيدة له (بدون البيانات الفنية/الإدارية)
 router.get('/my', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -94,6 +104,7 @@ router.get('/my', async (req, res) => {
     if (!doc.exists) return res.json({ success: true, date, found: false });
 
     const d = doc.data();
+    // فقط الحقول المفيدة للمندوب - البيانات الفنية (TGA/الأخطاء/الدفعة/المركبة/العقد) لا تصل له إطلاقًا
     res.json({
       success: true,
       date,
@@ -124,6 +135,7 @@ router.get('/my', async (req, res) => {
   }
 });
 
+// المشرف: عرض التقرير الكامل بكل الأعمدة الأصلية (بدون إخفاء أي شيء) ليوم معيّن
 router.get('/day', requireAdmin, async (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().slice(0, 10);
@@ -135,6 +147,7 @@ router.get('/day', requireAdmin, async (req, res) => {
   }
 });
 
+// المشرف: تعديل أي حقل بعد الرفع (بما فيها إضافة ملاحظة خاصة تظهر للمندوب) - تحديث صامت بدون إشعار
 router.patch('/:driverId/:date', requireAdmin, async (req, res) => {
   try {
     const { driverId, date } = req.params;

@@ -5,8 +5,9 @@ const { verifyToken, requireAdmin } = require('../middleware/auth');
 
 router.use(verifyToken);
 
-const MAX_ATTACHMENT_SIZE = 700 * 1024;
+const MAX_ATTACHMENT_SIZE = 700 * 1024; // نفس القيد المستخدم في نظام الرسائل (بدون تخزين سحابي مدفوع)
 
+// المندوب يرسل ملاحظة سريعة (مطعم مغلق / عميل لا يرد / حادث / عطل / مشكلة تطبيق) مع صورة اختيارية
 router.post('/', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -25,7 +26,7 @@ router.post('/', async (req, res) => {
 
     const docRef = await db.collection('dailyNotes').add({
       driverId: req.user.driverId,
-      type,
+      type, // 'restaurant_closed' | 'customer_no_response' | 'accident' | 'malfunction' | 'app_issue' | 'other'
       note: note || '',
       attachmentData: attachmentData || null,
       attachmentType: attachmentType || null,
@@ -40,6 +41,7 @@ router.post('/', async (req, res) => {
   }
 });
 
+// المندوب يشاهد ملاحظاته السابقة فقط
 router.get('/my', async (req, res) => {
   try {
     if (req.user.role !== 'driver') {
@@ -60,6 +62,7 @@ router.get('/my', async (req, res) => {
   }
 });
 
+// المشرف: عرض كل الملاحظات (يمكن تصفيتها حسب النوع أو الحالة)
 router.get('/', requireAdmin, async (req, res) => {
   try {
     let query = db.collection('dailyNotes').orderBy('createdAt', 'desc').limit(200);
@@ -73,6 +76,7 @@ router.get('/', requireAdmin, async (req, res) => {
   }
 });
 
+// المشرف: تعليم الملاحظة كمُطَّلَع عليها
 router.patch('/:id/seen', requireAdmin, async (req, res) => {
   try {
     await db.collection('dailyNotes').doc(req.params.id).update({ seenByAdmin: true });

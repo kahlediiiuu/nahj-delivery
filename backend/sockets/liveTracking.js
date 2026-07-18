@@ -1,5 +1,7 @@
 const { rtdb, db } = require('../config/firebase');
 
+// يبث تحديثات المواقع لحظيًا لكل المشرفين المتصلين بلوحة التحكم عبر Socket.io
+// يعتمد على مستمع Firebase Realtime Database (onValue) بدل الاستعلام المتكرر (أوفر وأسرع)
 function initLiveTracking(io) {
   const liveRef = rtdb.ref('liveLocations');
 
@@ -8,7 +10,9 @@ function initLiveTracking(io) {
     io.emit('locations:update', data);
   });
 
-  const activeAlerts = new Set();
+  // فحص دوري كل 15 ثانية: نتتبع حالة كل تنبيه (نشط/غير نشط) لكل مندوب
+  // ونبث فقط التنبيهات "الجديدة" (انتقلت من غير نشطة إلى نشطة) لتفادي إزعاج المشرف بتكرارها باستمرار
+  const activeAlerts = new Set(); // مفاتيح مثل "driverId:gps_off"
 
   setInterval(async () => {
     const snapshot = await liveRef.once('value');
@@ -42,6 +46,7 @@ function initLiveTracking(io) {
       );
     }
 
+    // تحديث القائمة النشطة (يحذف تلقائياً أي تنبيه زال، فيسمح بتكراره لاحقاً إن عاد)
     activeAlerts.clear();
     currentlyActive.forEach((k) => activeAlerts.add(k));
 
@@ -53,6 +58,7 @@ function initLiveTracking(io) {
   io.on('connection', (socket) => {
     console.log('لوحة تحكم متصلة:', socket.id);
 
+    // عند ضغط المشرف زر "تحديث الآن"، نرسل له أحدث نسخة من المواقع فورًا بدون انتظار
     socket.on('request:locations', async () => {
       try {
         const snapshot = await liveRef.once('value');

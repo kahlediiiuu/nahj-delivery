@@ -10,7 +10,7 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
   window.location.href = 'login.html';
 });
 
-let driversInfo = {};
+let driversInfo = {}; // driverId -> {name, phone, driverCode, ...}
 let latestLocations = {};
 
 async function loadDrivers() {
@@ -23,7 +23,7 @@ async function loadDrivers() {
   }
 }
 
-let activeStatFilter = null;
+let activeStatFilter = null; // null = بلا فلتر | 'online' | 'offline' | 'inside' | 'outside' | 'moving' | 'stopped'
 
 function computeStatus(loc) {
   const now = Date.now();
@@ -65,6 +65,7 @@ function renderDriverList(filter = '') {
     });
 }
 
+// ربط أزرار الإحصائيات بالفلترة الفعلية عند الضغط عليها
 function setupStatFilters() {
   const map = {
     statOnline: 'online', statOffline: 'offline',
@@ -98,14 +99,19 @@ const alertReasons = [
 
 async function sendAlertMessage(driverId, text, silent = false) {
   try {
-    await fetch(`${API_URL}/messages`, {
+    const res = await fetch(`${API_URL}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ driverId, text: `⚠️ ${text}`, silent }),
     });
-    alert('تم إرسال التنبيه بنجاح، وسيصل للمندوب كإشعار فوري بصوت (بمجرد فتحه للتطبيق أو أثناء الدوام)');
+    const data = await res.json();
+    if (data.success) {
+      alert('✅ تم إرسال التنبيه بنجاح، وسيصل للمندوب كإشعار فوري (بمجرد فتحه للتطبيق أو أثناء الدوام)');
+    } else {
+      alert('❌ فشل إرسال التنبيه: ' + (data.message || 'خطأ غير معروف'));
+    }
   } catch (_) {
-    alert('تعذّر إرسال التنبيه، تحقق من الاتصال');
+    alert('❌ تعذّر إرسال التنبيه، تحقق من الاتصال بالإنترنت');
   }
 }
 
@@ -116,14 +122,16 @@ async function sendCustomAlert(driverId) {
     await sendAlertMessage(driverId, reason.text);
     return;
   }
+  // "رسالة أخرى مخصصة" -> افتح نافذة الإشعار العام مع تعبئة المندوب مسبقًا لكتابة نص حر بشكل احترافي
   openGlobalAlertModal(driverId);
 }
 window.sendCustomAlert = sendCustomAlert;
 
+// ================= نافذة الإشعار العام: اختيار أي مندوب من أي مكان بالصفحة =================
 function renderGlobalAlertReasons() {
   const select = document.getElementById('globalAlertReasonSelect');
   select.innerHTML = alertReasons.map((r, i) => `<option value="${i}">${r.label}</option>`).join('');
-  select.value = alertReasons.length - 1;
+  select.value = alertReasons.length - 1; // افتراضيًا: رسالة مخصصة
   document.getElementById('globalAlertCustomTextWrap').style.display = alertReasons[select.value].text ? 'none' : 'block';
 }
 
@@ -224,6 +232,7 @@ window.openDriverDetails = function (driverId) {
   modal.classList.remove('hidden');
 };
 
+// ================= عرض/إخفاء مسار حركة اليوم مباشرة فوق الخريطة المباشرة =================
 window.routeVisibleFor = null;
 let todayRouteLine = null;
 
@@ -256,6 +265,7 @@ window.toggleTodayRoute = async function (driverId) {
   }
 };
 
+// يرسل للمندوب رابط خريطة حقيقيًا يوضح موقعه المسجَّل لدى النظام حاليًا (مفيد عند اعتراضه أنه "داخل النطاق" فعليًا)
 window.sendLocationProof = async function (driverId, lat, lng) {
   const mapsLink = `https://www.google.com/maps?q=${lat},${lng}`;
   const text = `📍 هذا هو موقعك المسجَّل لدينا الآن بالضبط:\n${mapsLink}\nإن كان مختلفًا عن موقعك الحقيقي، تأكد من تفعيل GPS بدقة عالية.`;
@@ -300,6 +310,7 @@ function showToast(text, driverId) {
   setTimeout(() => toast.remove(), 8000);
 }
 
+// ------- صوت التنبيه: نولّده مباشرة عبر Web Audio API بدون أي ملف صوتي خارجي -------
 function playAlertSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -313,10 +324,14 @@ function playAlertSound() {
     gain.connect(ctx.destination);
     oscillator.start();
     oscillator.stop(ctx.currentTime + 0.4);
-  } catch (_) {}
+  } catch (_) {
+    // بعض المتصفحات تمنع الصوت قبل أول تفاعل من المستخدم مع الصفحة - غير حرج
+  }
 }
 
+// ------- إشعارات المتصفح (تظهر حتى لو كانت اللوحة في تبويب آخر أو مصغّرة) -------
 if ('Notification' in window && Notification.permission === 'default') {
+  // نطلب الإذن فقط بعد أول نقرة من المشرف (متطلب أمان في المتصفحات الحديثة)
   document.body.addEventListener('click', () => Notification.requestPermission(), { once: true });
 }
 
@@ -334,6 +349,7 @@ const alertMessages = {
   low_battery: (name) => `🔋 ${name}: البطارية منخفضة`,
 };
 
+// الاتصال بالبث اللحظي
 const socket = io(SOCKET_URL);
 window.nahjSocket = socket;
 
@@ -358,8 +374,9 @@ socket.on('alerts:new', (alerts) => {
 });
 
 loadDrivers();
-setInterval(loadDrivers, 60000);
+setInterval(loadDrivers, 60000); // تحديث قائمة المناديب (الأسماء الجديدة إلخ) كل دقيقة
 
+// ================= الإشعار الجماعي =================
 document.getElementById('openBroadcastBtn').addEventListener('click', () => {
   document.getElementById('broadcastModal').classList.remove('hidden');
 });
@@ -380,20 +397,21 @@ document.getElementById('sendBroadcastBtn').addEventListener('click', async () =
       body: JSON.stringify({ target: 'all', texts: { ar, en: en || undefined, bn: bn || undefined } }),
     });
     const data = await res.json();
-    if (data.success) {
-      alert(`تم إرسال الإشعار بنجاح إلى ${data.count} مندوب.`);
+    if (res.ok && data.success) {
+      alert(`✅ تم إرسال الإشعار بنجاح إلى ${data.count} مندوب.`);
       document.getElementById('broadcastModal').classList.add('hidden');
       document.getElementById('broadcastTextAr').value = '';
       document.getElementById('broadcastTextEn').value = '';
       document.getElementById('broadcastTextBn').value = '';
     } else {
-      alert(data.message || 'حدث خطأ');
+      alert('❌ فشل الإرسال الجماعي: ' + (data.message || `رمز الخطأ ${res.status}`));
     }
   } catch (_) {
-    alert('تعذّر الاتصال بالخادم');
+    alert('❌ تعذّر الاتصال بالخادم');
   }
 });
 
+// ================= تصفية حسب المدينة =================
 window.activeCityFilter = null;
 
 const cityCoordinates = {
@@ -409,6 +427,7 @@ document.getElementById('cityFilterSelect').addEventListener('change', (e) => {
   window.activeCityFilter = e.target.value || null;
 
   if (window.activeCityFilter && cityCoordinates[window.activeCityFilter]) {
+    // انتقال فوري لمركز المدينة المختارة مباشرة
     map.setView(cityCoordinates[window.activeCityFilter], 12);
   }
 
@@ -416,6 +435,7 @@ document.getElementById('cityFilterSelect').addEventListener('change', (e) => {
   renderDriverList(document.getElementById('searchDriver').value);
 
   if (!window.activeCityFilter) {
+    // عند اختيار "كل المدن": وسّع الخريطة لتشمل فقط المناديب الظاهرين فعليًا الآن (وليس كل المدن نظريًا)
     setTimeout(() => {
       const visibleMarkers = Object.values(markers);
       if (visibleMarkers.length === 1) {
