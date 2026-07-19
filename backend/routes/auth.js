@@ -101,6 +101,12 @@ router.post('/driver/login', async (req, res) => {
       { expiresIn: '30d' }
     );
 
+    // سجل دخول حقيقي - يُستخدم لمعرفة هل المندوب فتح التطبيق فعليًا اليوم ومتى (يُنظَّف تلقائيًا بعد 24 ساعة)
+    await db.collection('loginSessions').add({
+      driverId: driverDoc.id,
+      loggedInAt: Date.now(),
+    });
+
     res.json({
       success: true,
       token,
@@ -240,6 +246,80 @@ router.post('/admin/create', async (req, res) => {
     await db.collection('admins').add({ username, passwordHash, name, createdAt: Date.now() });
 
     res.json({ success: true, message: 'تم إنشاء حساب المشرف الجديد بنجاح' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+// المندوب: تسجيل كل مرة يفتح فيها التطبيق فعليًا (وليس فقط عند إدخال كلمة المرور، لأن الجلسة تبقى مسجَّلة 30 يومًا)
+router.post('/driver/session-ping', async (req, res) => {
+  try {
+    const jwt = require('jsonwebtoken');
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ success: false });
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (e) {
+      return res.status(403).json({ success: false });
+    }
+    if (decoded.role !== 'driver') return res.status(403).json({ success: false });
+
+    await db.collection('loginSessions').add({
+      driverId: decoded.driverId,
+      loggedInAt: Date.now(),
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false });
+  }
+});
+
+// المشرف: عرض سجل فتح التطبيق لمندوب معيّن خلال آخر 24 ساعة فقط
+router.get('/driver/:driverId/sessions', async (req, res) => {
+  try {
+    const jwt = require('jsonwebtoken');
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ success: false });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'admin') return res.status(403).json({ success: false, message: 'للمشرف فقط' });
+
+    const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    const snap = await db.collection('loginSessions').where('driverId', '==', req.params.driverId).get();
+    const sessions = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((s) => s.loggedInAt >= dayAgo)
+      .sort((a, b) => b.loggedInAt - a.loggedInAt);
+
+    res.json({ success: true, sessions });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+// المشرف: تنظيف السجلات الأقدم من 24 ساعة يدويًا (Firestore لا يملك حذفًا تلقائيًا مجانيًا بدون إعداد إضافي)
+router.delete('/sessions/cleanup', async (req, res) => {
+  try {
+    const jwt = require('jsonwebtoken');
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ success: false });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'admin') return res.status(403).json({ success: false, message: 'للمشرف فقط' });
+
+    const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    const snap = await db.collection('loginSessions').get();
+    const old = snap.docs.filter((d) => (d.data().loggedInAt || 0) < dayAgo);
+    await Promise.all(old.map((d) => d.ref.delete()));
+
+    res.json({ success: true, deletedCount: old.length });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
