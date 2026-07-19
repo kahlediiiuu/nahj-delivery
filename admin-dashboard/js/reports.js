@@ -243,11 +243,71 @@ async function loadLeaveRequests() {
         <td>${r.note || '--'}</td>
         <td>${submitted}</td>
         <td>${statusLabels[r.status] || r.status}</td>
-        <td>${actions}</td>
+        <td>${actions}<br><button onclick="window.toggleLeaveNotes('${r.id}')" style="margin-top:4px;background:#7c3aed;color:#fff;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:11px;">💬 محادثة</button></td>
+      </tr>
+      <tr id="leave-notes-row-${r.id}" style="display:none;">
+        <td colspan="7" style="background:#f8fafc;">
+          <div id="leave-notes-${r.id}" style="padding:10px;font-size:13px;"></div>
+          <div style="display:flex;gap:8px;padding:0 10px 10px;">
+            <input type="text" id="leave-note-input-${r.id}" placeholder="اكتب ملاحظة (مثال: أرسل لي إثبات الحادث)..." style="flex:1;padding:6px;border:1px solid #cbd5e1;border-radius:6px;">
+            <button onclick="window.sendLeaveNote('${r.id}')" style="padding:6px 12px;background:#0f172a;color:#fff;border:none;border-radius:6px;cursor:pointer;">إرسال</button>
+          </div>
+        </td>
       </tr>`;
     })
     .join('');
 }
+
+window.toggleLeaveNotes = async function (leaveId) {
+  const row = document.getElementById(`leave-notes-row-${leaveId}`);
+  const isHidden = row.style.display === 'none';
+  row.style.display = isHidden ? 'table-row' : 'none';
+  if (!isHidden) return;
+
+  const container = document.getElementById(`leave-notes-${leaveId}`);
+  container.innerHTML = 'جاري التحميل...';
+  try {
+    const res = await fetch(`${API_URL}/leave/${leaveId}/notes`, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    if (!data.success || data.notes.length === 0) {
+      container.innerHTML = '<span style="color:#94a3b8;">لا توجد ملاحظات بعد، ابدأ المحادثة أدناه</span>';
+      return;
+    }
+    container.innerHTML = data.notes
+      .map((n) => {
+        const time = new Date(n.createdAt).toLocaleString('ar-SA', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'numeric' });
+        const who = n.sender === 'admin' ? '👤 أنت (المشرف)' : '🚴 المندوب';
+        return `<div style="margin-bottom:6px;"><b>${who}</b> <span style="color:#94a3b8;font-size:11px;">${time}</span><br>${n.text}</div>`;
+      })
+      .join('');
+  } catch (_) {
+    container.innerHTML = '<span style="color:#dc2626;">تعذّر تحميل المحادثة</span>';
+  }
+};
+
+window.sendLeaveNote = async function (leaveId) {
+  const input = document.getElementById(`leave-note-input-${leaveId}`);
+  const text = input.value.trim();
+  if (!text) return;
+  try {
+    const res = await fetch(`${API_URL}/leave/${leaveId}/note`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ text }),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      input.value = '';
+      const row = document.getElementById(`leave-notes-row-${leaveId}`);
+      row.style.display = 'none';
+      window.toggleLeaveNotes(leaveId);
+    } else {
+      alert('❌ فشل الإرسال: ' + (data.message || 'خطأ غير معروف'));
+    }
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم');
+  }
+};
 
 window.decideLeave = async function (id, status) {
   const statusLabel = status === 'approved' ? 'قبول' : 'رفض';
