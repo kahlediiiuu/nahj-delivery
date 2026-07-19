@@ -15,7 +15,6 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
   final _noteController = TextEditingController();
   bool _sending = false;
   List<dynamic> _history = [];
-  bool _loadingHistory = true;
 
   final _reasons = [
     {'value': 'sick', 'key': 'leaveReasonSick'},
@@ -30,15 +29,19 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
     _loadHistory();
   }
 
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadHistory() async {
-    setState(() => _loadingHistory = true);
     try {
       final result = await ApiService.getMyLeaveRequests();
       if (result['success'] == true) {
         setState(() => _history = result['requests'] ?? []);
       }
     } catch (_) {}
-    setState(() => _loadingHistory = false);
   }
 
   Future<void> _pickDate() async {
@@ -109,10 +112,67 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
     }
   }
 
+  void _openHistorySheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.7,
+        builder: (ctx, scrollController) => Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(AppStrings.get('myLeaveRequests'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 10),
+              Expanded(
+                child: _history.isEmpty
+                    ? const Center(child: Text('لا توجد طلبات سابقة', style: TextStyle(color: Colors.grey)))
+                    : ListView.builder(
+                        controller: scrollController,
+                        itemCount: _history.length,
+                        itemBuilder: (ctx, i) {
+                          final r = _history[i];
+                          return Card(
+                            child: ListTile(
+                              title: Text(r['date'] ?? ''),
+                              subtitle: Text(r['note']?.toString().isNotEmpty == true ? r['note'] : ''),
+                              trailing: Text(
+                                _statusLabel(r['status'] ?? 'pending'),
+                                style: TextStyle(color: _statusColor(r['status'] ?? 'pending'), fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                              onTap: () => _openConversation(r),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openConversation(Map request) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: _LeaveConversationView(request: request, statusLabel: _statusLabel, statusColor: _statusColor),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(AppStrings.get('requestLeave'))),
+      appBar: AppBar(
+        title: Text(AppStrings.get('requestLeave')),
+        actions: [
+          IconButton(icon: const Icon(Icons.history), tooltip: 'طلباتي السابقة', onPressed: _openHistorySheet),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -167,38 +227,132 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 24),
-          Text(AppStrings.get('myLeaveRequests'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 8),
-          if (_loadingHistory)
-            const Center(child: CircularProgressIndicator())
-          else if (_history.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Center(child: Text('لا توجد طلبات سابقة', style: TextStyle(color: Colors.grey))),
-            )
-          else
-            ..._history.map((r) => Card(
-                  child: ListTile(
-                    title: Text(r['date'] ?? ''),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(r['note'] ?? ''),
-                        if (r['adminNote'] != null && r['adminNote'].toString().isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text('📝 ملاحظة الإدارة: ${r['adminNote']}', style: const TextStyle(color: Colors.blue, fontSize: 12)),
-                          ),
-                      ],
-                    ),
-                    trailing: Text(
-                      _statusLabel(r['status'] ?? 'pending'),
-                      style: TextStyle(color: _statusColor(r['status'] ?? 'pending'), fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                )),
+          const SizedBox(height: 20),
+          OutlinedButton.icon(
+            onPressed: _openHistorySheet,
+            icon: const Icon(Icons.list_alt),
+            label: Text('${AppStrings.get('myLeaveRequests')} (${_history.length})'),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _LeaveConversationView extends StatefulWidget {
+  final Map request;
+  final String Function(String) statusLabel;
+  final Color Function(String) statusColor;
+  const _LeaveConversationView({required this.request, required this.statusLabel, required this.statusColor});
+
+  @override
+  State<_LeaveConversationView> createState() => _LeaveConversationViewState();
+}
+
+class _LeaveConversationViewState extends State<_LeaveConversationView> {
+  List<dynamic> _notes = [];
+  bool _loading = true;
+  final _controller = TextEditingController();
+  bool _sending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final result = await ApiService.getLeaveNotes(widget.request['id']);
+      if (result['success'] == true) setState(() => _notes = result['notes'] ?? []);
+    } catch (_) {}
+    setState(() => _loading = false);
+  }
+
+  Future<void> _send() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _sending = true);
+    try {
+      final result = await ApiService.sendLeaveNote(widget.request['id'], text);
+      if (result['success'] == true) {
+        _controller.clear();
+        _load();
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.request;
+    return SizedBox(
+      width: double.maxFinite,
+      height: 500,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('طلب إجازة ${r['date']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Text(widget.statusLabel(r['status'] ?? 'pending'), style: TextStyle(color: widget.statusColor(r['status'] ?? 'pending'), fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const Divider(),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _notes.isEmpty
+                      ? const Center(child: Text('لا توجد ملاحظات بعد', style: TextStyle(color: Colors.grey)))
+                      : ListView.builder(
+                          itemCount: _notes.length,
+                          itemBuilder: (ctx, i) {
+                            final n = _notes[i];
+                            final isMe = n['sender'] == 'driver';
+                            return Align(
+                              alignment: isMe ? Alignment.centerLeft : Alignment.centerRight,
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.all(10),
+                                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.6),
+                                decoration: BoxDecoration(
+                                  color: isMe ? Colors.blue[50] : const Color(0xFF0F172A),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(n['text'] ?? '', style: TextStyle(color: isMe ? Colors.black87 : Colors.white)),
+                              ),
+                            );
+                          },
+                        ),
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    decoration: const InputDecoration(hintText: 'اكتب ردك هنا...', isDense: true, border: OutlineInputBorder()),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  onPressed: _sending ? null : _send,
+                  icon: _sending ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.send),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
