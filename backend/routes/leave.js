@@ -68,6 +68,58 @@ router.get('/', requireAdmin, async (req, res) => {
   }
 });
 
+// محادثة الملاحظات على طلب إجازة معيّن - يستطيع المندوب والمشرف تبادل الرسائل قبل القرار النهائي
+router.post('/:id/note', async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, message: 'اكتب نص الملاحظة أولًا' });
+    }
+    const doc = await db.collection('leaveRequests').doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).json({ success: false, message: 'الطلب غير موجود' });
+
+    if (req.user.role === 'driver' && doc.data().driverId !== req.user.driverId) {
+      return res.status(403).json({ success: false, message: 'غير مسموح' });
+    }
+
+    const docRef = await db.collection('leaveNotes').add({
+      leaveRequestId: req.params.id,
+      driverId: doc.data().driverId,
+      sender: req.user.role,
+      text: text.trim(),
+      createdAt: Date.now(),
+    });
+
+    const { sendPushToDriver } = require('../utils/push');
+    if (req.user.role === 'admin') {
+      await sendPushToDriver(doc.data().driverId, '💬 ملاحظة جديدة على طلب إجازتك', text.trim(), {});
+    }
+    // إشعار المشرف بملاحظة مندوب يتم عبر شارة الإشعارات في لوحة التحكم (لا حاجة لإشعار push للمشرف)
+
+    res.json({ success: true, id: docRef.id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+router.get('/:id/notes', async (req, res) => {
+  try {
+    const doc = await db.collection('leaveRequests').doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).json({ success: false, message: 'الطلب غير موجود' });
+    if (req.user.role === 'driver' && doc.data().driverId !== req.user.driverId) {
+      return res.status(403).json({ success: false, message: 'غير مسموح' });
+    }
+
+    const snap = await db.collection('leaveNotes').where('leaveRequestId', '==', req.params.id).get();
+    const notes = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.createdAt - b.createdAt);
+    res.json({ success: true, notes });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
 // المشرف: قبول أو رفض طلب إجازة
 router.patch('/:id', requireAdmin, async (req, res) => {
   try {
@@ -84,7 +136,17 @@ router.patch('/:id', requireAdmin, async (req, res) => {
       adminNote: adminNote || '',
     });
 
-    // إشعار فوري للمندوب بالقرار (مع الملاحظة إن وُجدت - مثل طلب توثيق سبب الغياب)
+    // ✅ ربط تلقائي بسجل الغياب عند الموافقة (كما طُلب سابقًا) - يظهر تلقائيًا في تبويب "سجل الغياب"
+    if (status === 'approved') {
+      await db.collection('absences').doc(`${doc.data().driverId}_${doc.data().date}`).set({
+        driverId: doc.data().driverId,
+        date: doc.data().date,
+        note: `إجازة معتمدة (${doc.data().reasonType || ''}) - ${adminNote || 'بدون ملاحظة إضافية'}`,
+        linkedLeaveRequestId: req.params.id,
+        createdAt: Date.now(),
+      });
+    }
+
     const { sendPushToDriver } = require('../utils/push');
     const statusText = status === 'approved' ? '✅ تم قبول طلب إجازتك' : '❌ تم رفض طلب إجازتك';
     const text = adminNote ? `${statusText}\nملاحظة الإدارة: ${adminNote}` : statusText;
