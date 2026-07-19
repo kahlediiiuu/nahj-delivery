@@ -115,6 +115,17 @@ class ApiService {
     return (prefs.getStringList(_queueKey) ?? []).length;
   }
 
+  static Future<void> pingSession() async {
+    final token = await getToken();
+    if (token == null) return;
+    try {
+      await http.post(
+        Uri.parse('$baseUrl/auth/driver/session-ping'),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 10));
+    } catch (_) {}
+  }
+
   static Future<void> registerLanguage(String language) async {
     final token = await getToken();
     if (token == null) return;
@@ -147,6 +158,25 @@ class ApiService {
       body: jsonEncode({'response': response}),
     ).timeout(const Duration(seconds: 30));
     return res.statusCode == 200;
+  }
+
+  static Future<Map<String, dynamic>> getLeaveNotes(String leaveId) async {
+    final token = await getToken();
+    final res = await http.get(
+      Uri.parse('$baseUrl/leave/$leaveId/notes'),
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 30));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> sendLeaveNote(String leaveId, String text) async {
+    final token = await getToken();
+    final res = await http.post(
+      Uri.parse('$baseUrl/leave/$leaveId/note'),
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      body: jsonEncode({'text': text}),
+    ).timeout(const Duration(seconds: 30));
+    return jsonDecode(res.body);
   }
 
   static Future<Map<String, dynamic>> submitLeaveRequest({
