@@ -233,8 +233,31 @@ window.openDriverDetails = function (driverId) {
     <button onclick="window.toggleTodayRoute('${driverId}')" style="width:100%;padding:10px;margin-top:8px;background:${window.routeVisibleFor === driverId ? '#dc2626' : '#16a34a'};color:#fff;border:none;border-radius:6px;cursor:pointer;">
       ${window.routeVisibleFor === driverId ? '🛣️ إخفاء مسار اليوم' : '🛣️ عرض مسار اليوم على الخريطة'}
     </button>
+    <button onclick="window.showSessionLog('${driverId}')" style="width:100%;padding:10px;margin-top:8px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;">
+      📱 سجل فتح التطبيق (آخر 24 ساعة)
+    </button>
+    <div id="sessionLogBox" style="margin-top:10px;font-size:12px;"></div>
   `;
   modal.classList.remove('hidden');
+};
+
+window.showSessionLog = async function (driverId) {
+  const box = document.getElementById('sessionLogBox');
+  box.innerHTML = 'جاري التحميل...';
+  try {
+    const res = await fetch(`${API_URL}/auth/driver/${driverId}/sessions`, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    if (!data.success || data.sessions.length === 0) {
+      box.innerHTML = '<span style="color:#94a3b8;">⚠️ لم يفتح المندوب التطبيق خلال آخر 24 ساعة</span>';
+      return;
+    }
+    box.innerHTML = '<b>مرات فتح التطبيق اليوم:</b><br>' + data.sessions
+      .map((s) => new Date(s.loggedInAt).toLocaleString('ar-SA', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'numeric' }))
+      .map((t) => `🕐 ${t}`)
+      .join('<br>');
+  } catch (_) {
+    box.innerHTML = '<span style="color:#dc2626;">تعذّر تحميل السجل</span>';
+  }
 };
 
 // ================= عرض/إخفاء مسار حركة اليوم مباشرة فوق الخريطة المباشرة =================
