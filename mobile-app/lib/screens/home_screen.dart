@@ -9,11 +9,9 @@ import '../services/location_service.dart';
 import '../services/app_strings.dart';
 import 'login_screen.dart';
 import 'my_report_screen.dart';
-import 'daily_log_screen.dart';
 import 'performance_report_screen.dart';
 import 'messages_screen.dart';
 import 'leave_request_screen.dart';
-import 'work_hours_screen.dart';
 import 'daily_notes_screen.dart';
 import 'announcements_screen.dart';
 import 'alarm_screen.dart';
@@ -44,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadName();
     _syncShiftStatus();
+    ApiService.pingSession();
     _refreshUnread();
     _checkLastCrash();
     _setupPushNotifications();
@@ -311,6 +310,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _logout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('👋 هل تريد الخروج؟'),
+        content: const Text(
+          'تذكير: بخروجك من التطبيق ستفوّت التنبيهات والتحفيزات والعروض الخاصة بك، ولن تعرف مستجدات مستحقاتك ومكافآتك أولًا بأول.\n\nهذا التطبيق مصمَّم لخدمتك أنت 💙',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('البقاء في التطبيق')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('تأكيد الخروج', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
     if (_onShift) {
       await ApiService.endShift();
       await LocationService.stop();
@@ -349,7 +363,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
             ],
           ),
-          IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
+          TextButton.icon(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout, color: Colors.white70, size: 18),
+            label: const Text('خروج', style: TextStyle(color: Colors.white70)),
+          ),
         ],
       ),
       body: RefreshIndicator(
@@ -463,9 +481,7 @@ class _HomeScreenState extends State<HomeScreen> {
               childAspectRatio: 1.3,
               children: [
                 _featureCard('🏆', AppStrings.get('performanceReport'), Colors.indigo, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PerformanceReportScreen()))),
-                _featureCard('📦', AppStrings.get('dailyLog'), Colors.teal, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DailyLogScreen()))),
                 _featureCard('🗓️', AppStrings.get('requestLeave'), Colors.deepPurple, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LeaveRequestScreen()))),
-                _featureCard('⏱️', 'ساعات عملي', Colors.blue, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WorkHoursScreen()))),
                 _featureCard('📝', 'ملاحظة يومية', Colors.orange, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DailyNotesScreen()))),
                 _featureCard('📊', AppStrings.get('myDailyReport'), Colors.blueGrey, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyReportScreen()))),
                 _featureCard('📢', 'أخبار الشركة', Colors.pink, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AnnouncementsScreen()))),
