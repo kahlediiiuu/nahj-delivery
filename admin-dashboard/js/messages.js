@@ -86,12 +86,16 @@ function renderMessages(messages) {
         ? `<div style="margin-top:6px;padding:6px 8px;background:rgba(0,0,0,.06);border-radius:8px;font-size:12px;">رد المندوب: ${m.response}</div>`
         : (m.requiresResponse ? `<div style="margin-top:6px;font-size:11px;color:#eab308;">⏳ بانتظار رد المندوب</div>` : '');
 
+      const readStatus = isAdmin
+        ? (m.readByDriver ? '<span style="font-size:10px;opacity:.7;">✅ قرأها المندوب</span>' : '<span style="font-size:10px;opacity:.7;">⏳ لم يفتحها بعد</span>')
+        : '';
+
       return `
         <div class="msg-bubble ${isAdmin ? 'msg-admin' : 'msg-driver'}">
           ${m.text}
           ${attachmentBlock}
           ${responseBlock}
-          <div class="msg-time">${time}</div>
+          <div class="msg-time">${time} ${readStatus}</div>
           ${isAdmin ? `
             <div style="margin-top:6px;display:flex;gap:6px;">
               <button onclick="resendMessage('${m.id}')" style="font-size:11px;padding:3px 8px;border:1px solid #fff;background:transparent;color:#fff;border-radius:6px;cursor:pointer;">🔁 إعادة إرسال</button>
