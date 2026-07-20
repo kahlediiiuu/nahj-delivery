@@ -262,4 +262,14 @@ router.get('/:driverId/:month', requireAdmin, async (req, res) => {
   }
 });
 
+router.delete('/advance/:id', requireAdmin, async (req, res) => {
+  try {
+    await db.collection('advanceRequests').doc(req.params.id).delete();
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
 module.exports = router;
