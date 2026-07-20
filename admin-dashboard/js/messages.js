@@ -264,6 +264,6 @@ document.getElementById('motivationalSelect')?.addEventListener('change', (e) =>
 setInterval(() => {
   loadConversations();
   if (currentDriverId) loadMessages();
-}, 20000); // 20 ثانية بدل 5 - يخفّف الحمل على الخادم المجاني دون التأثير على تجربة الاستخدام
+}, 40000); // 40 ثانية بدل 20 - توفير إضافي حرج للنطاق الترددي المجاني بعد بلوغ الحد الشهري
 
 loadConversations();
