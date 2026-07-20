@@ -187,6 +187,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _checkLastCrash() async {
     final prefs = await SharedPreferences.getInstance();
+
+    if (prefs.getBool('session_invalidated') == true) {
+      await prefs.remove('session_invalidated');
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('ℹ️ تنبيه'),
+            content: const Text('تم تسجيل الدخول لحسابك من جهاز آخر مؤخرًا، لذلك توقف هذا الجهاز عن إرسال بيانات إضافية. إن كان هذا خطأً، تواصل مع الإدارة.'),
+            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('حسنًا'))],
+          ),
+        );
+      }
+    }
+
     final log = prefs.getString('last_crash_log');
     if (log != null && mounted) {
       await prefs.remove('last_crash_log');
