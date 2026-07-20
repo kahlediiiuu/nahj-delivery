@@ -243,7 +243,7 @@ async function loadLeaveRequests() {
         <td>${r.note || '--'}</td>
         <td>${submitted}</td>
         <td>${statusLabels[r.status] || r.status}</td>
-        <td>${actions}<br><button onclick="window.toggleLeaveNotes('${r.id}')" style="margin-top:4px;background:#7c3aed;color:#fff;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:11px;">💬 محادثة</button></td>
+        <td>${actions}<br><button onclick="window.toggleLeaveNotes('${r.id}')" style="margin-top:4px;background:#7c3aed;color:#fff;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:11px;">💬 محادثة</button><br><button onclick="window.deleteLeaveRequest('${r.id}')" style="margin-top:4px;background:#dc2626;color:#fff;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:11px;">🗑️ حذف</button></td>
       </tr>
       <tr id="leave-notes-row-${r.id}" style="display:none;">
         <td colspan="7" style="background:#f8fafc;">
@@ -309,6 +309,21 @@ window.sendLeaveNote = async function (leaveId) {
   }
 };
 
+window.deleteLeaveRequest = async function (id) {
+  if (!confirm('حذف طلب الإجازة هذا نهائيًا؟ (سيُحذف مع كل المحادثة المرتبطة به)')) return;
+  try {
+    const res = await fetch(`${API_URL}/leave/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      loadLeaveRequests();
+    } else {
+      alert('❌ فشل الحذف: ' + (data.message || 'خطأ غير معروف'));
+    }
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم');
+  }
+};
+
 window.decideLeave = async function (id, status) {
   const statusLabel = status === 'approved' ? 'قبول' : 'رفض';
   const adminNote = prompt(
@@ -359,10 +374,26 @@ async function loadAbsences() {
         <td>
           <input type="text" value="${a.note || ''}" placeholder="اكتب سبب الغياب..." style="width:70%;padding:4px;border:1px solid #cbd5e1;border-radius:6px;" onchange="saveAbsenceNote('${a.id}', this.value)">
         </td>
+        <td><button onclick="window.deleteAbsence('${a.id}')" style="background:#dc2626;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;">🗑️ حذف</button></td>
       </tr>`;
     })
-    .join('') || '<tr><td colspan="4" style="text-align:center;color:#16a34a;">لا يوجد غياب في هذا اليوم 🎉</td></tr>';
+    .join('') || '<tr><td colspan="5" style="text-align:center;color:#16a34a;">لا يوجد غياب في هذا اليوم 🎉</td></tr>';
 }
+
+window.deleteAbsence = async function (id) {
+  if (!confirm('حذف سجل الغياب هذا نهائيًا؟')) return;
+  try {
+    const res = await fetch(`${API_URL}/performance/absences/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      loadAbsences();
+    } else {
+      alert('❌ فشل الحذف: ' + (data.message || 'خطأ غير معروف'));
+    }
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم');
+  }
+};
 
 window.saveAbsenceNote = async function (id, note) {
   try {
