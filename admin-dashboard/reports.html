@@ -72,6 +72,13 @@
 
   <!-- تبويب لوحة الأداء -->
   <div class="tab-panel" id="tab-leaderboard">
+    <div style="background:#eef2ff;border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px;color:#3730a3;">
+      ℹ️ <b>ما هذه الصفحة؟</b> هذا الترتيب مبني <b>100% على التتبع الحقيقي عبر GPS</b> أثناء "تسجيل الحضور" (وليس أي إدخال يدوي من المندوب).
+      <br>• <b>إجمالي المسافة</b>: مجموع الكيلومترات المقاسة فعليًا بالموقع خلال الفترة المختارة.
+      <br>• <b>متوسط يومي</b>: إجمالي المسافة ÷ عدد الأيام التي كان فيها نشاط حقيقي فقط.
+      <br>• <b>أيام النشاط</b>: عدد الأيام التي تحرّك فيها المندوب فعليًا (مسافة أكبر من صفر).
+      <br>💡 <b>الفائدة</b>: تكشف من يعمل بجدية فعلية (حركة حقيقية) مقابل من يسجّل حضورًا دون نشاط ملموس.
+    </div>
     <div class="controls-row">
       <label>من: <input type="date" id="fromDate"></label>
       <label>إلى: <input type="date" id="toDate"></label>
@@ -146,7 +153,7 @@
     <table>
       <thead>
         <tr>
-          <th>المندوب</th><th>رقم المندوب</th><th>الجوال</th><th>ملاحظة/سبب الغياب</th>
+          <th>المندوب</th><th>رقم المندوب</th><th>الجوال</th><th>ملاحظة/سبب الغياب</th><th>إجراء</th>
         </tr>
       </thead>
       <tbody id="absencesTableBody"></tbody>
