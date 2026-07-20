@@ -167,4 +167,16 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   }
 });
 
+router.delete('/:id', requireAdmin, async (req, res) => {
+  try {
+    await db.collection('leaveRequests').doc(req.params.id).delete();
+    const notesSnap = await db.collection('leaveNotes').where('leaveRequestId', '==', req.params.id).get();
+    await Promise.all(notesSnap.docs.map((d) => d.ref.delete()));
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
 module.exports = router;
