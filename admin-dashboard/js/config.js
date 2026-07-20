@@ -32,5 +32,5 @@ async function updateNavBadges() {
 
 if (sessionStorage.getItem('nahj_admin_token')) {
   updateNavBadges();
-  setInterval(updateNavBadges, 30000); // كل 30 ثانية - خفيف جدًا على الخادم (مجرد أعداد، بدون محتوى)
+  setInterval(updateNavBadges, 60000); // كل دقيقة بدل 30 ثانية - توفير إضافي للنطاق الترددي المجاني
 }
