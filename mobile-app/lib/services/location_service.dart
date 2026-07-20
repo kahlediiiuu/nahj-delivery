@@ -181,9 +181,13 @@ Future<void> _runServiceLoop(ServiceInstance service) async {
           'gpsEnabled': true,
           'isInternetConnected': isConnected,
         });
-        // عند فشل الإرسال بسبب انقطاع مؤقت، سيُعاد إرسال أحدث نقطة تلقائياً
-        // في الدورة القادمة (كل 8 ثوانٍ) فور عودة الإنترنت - لا حاجة لطابور تخزين معقد
-        // لأن الفارق الزمني صغير جداً ولا يؤثر على دقة التتبع اللحظي.
+        // ✅ إن سجَّل المندوب الدخول من جهاز آخر، تتوقف هذه الخدمة عن نفسها فورًا في هذا الجهاز
+        final prefs = await SharedPreferences.getInstance();
+        if (prefs.getBool('session_invalidated') == true) {
+          timer?.cancel();
+          service.stopSelf();
+          return;
+        }
       } else if (!gpsEnabled) {
         await ApiService.sendLocation({
           'lat': lat, 'lng': lng, 'speed': 0, 'accuracy': 0,
