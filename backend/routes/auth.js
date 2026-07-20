@@ -95,11 +95,19 @@ router.post('/driver/login', async (req, res) => {
       return res.status(401).json({ success: false, message: 'بيانات الدخول غير صحيحة' });
     }
 
+    const crypto = require('crypto');
+    const sessionId = crypto.randomBytes(12).toString('hex');
+
     const token = jwt.sign(
-      { id: driverDoc.id, driverId: driverDoc.id, role: 'driver' },
+      { id: driverDoc.id, driverId: driverDoc.id, role: 'driver', sessionId },
       process.env.JWT_SECRET,
       { expiresIn: '30d' }
     );
+
+    // ✅ نُسجِّل هذه الجلسة كـ"الجلسة النشطة الوحيدة" - أي جهاز آخر كان مسجَّلًا بنفس الحساب
+    // يتوقف تلقائيًا عن التحكم بالموقع المعروض على الخريطة من اللحظة التالية لتحديث موقعه
+    const { rtdb } = require('../config/firebase');
+    await rtdb.ref(`driverSessions/${driverDoc.id}`).set(sessionId);
 
     // سجل دخول حقيقي - يُستخدم لمعرفة هل المندوب فتح التطبيق فعليًا اليوم ومتى (يُنظَّف تلقائيًا بعد 24 ساعة)
     await db.collection('loginSessions').add({
