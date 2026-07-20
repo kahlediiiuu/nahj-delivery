@@ -247,6 +247,16 @@ router.patch('/absences/:id', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
+router.delete('/absences/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    await db.collection('absences').doc(req.params.id).delete();
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
 // المشرف: تعديل أي حقل في تقرير أداء يوم معيّن لمندوب (بعد الرفع)
 router.patch('/:driverId/:date', verifyToken, requireAdmin, async (req, res) => {
   try {
