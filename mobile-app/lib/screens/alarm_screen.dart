@@ -32,11 +32,13 @@ class _AlarmScreenState extends State<AlarmScreen> {
       const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
     );
     const channel = AndroidNotificationChannel(
-      'nahj_alarm_channel',
+      'nahj_alarm_channel_v2',
       'منبه بدء الدوام',
       description: 'تذكير يومي ببدء دوامك حتى لا تفوّت أي شفت',
       importance: Importance.max,
       playSound: true,
+      // نستخدم صوت أندرويد الافتراضي عمدًا (بدون تحديد ملف صوت مخصص) لأن أي ملف صوت مخصص
+      // يتطلب إضافته فعليًا لمجلد android/app/src/main/res/raw وهو غير موجود حاليًا في المشروع
     );
     await _notificationsPlugin
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
@@ -100,6 +102,8 @@ class _AlarmScreenState extends State<AlarmScreen> {
     }
   }
 
+  /// يجدول إشعارًا محليًا يتكرر كل يوم في نفس الوقت - هذا يعمل بالكامل على الجهاز
+  /// (لا يحتاج إنترنت، ولا اتصالًا بالخادم، ولا علاقة له إطلاقًا بخدمة تتبع الموقع).
   Future<void> _scheduleDailyAlarm(TimeOfDay time) async {
     final now = tz.TZDateTime.now(tz.local);
     var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, time.hour, time.minute);
@@ -114,7 +118,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
       scheduled,
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'nahj_alarm_channel',
+          'nahj_alarm_channel_v2',
           'منبه بدء الدوام',
           importance: Importance.max,
           priority: Priority.high,
@@ -124,7 +128,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
+      matchDateTimeComponents: DateTimeComponents.time, // يتكرر يوميًا بنفس الوقت تلقائيًا
     );
   }
 
@@ -147,7 +151,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
                       SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'هذا المنبه يعمل على جوالك مباشرة، حتى بدون إنترنت، ولا علاقة له بتتبع موقعك.',
+                          'هذا المنبه يعمل على جوالك مباشرة، حتى بدون إنترنت.',
                           style: TextStyle(fontSize: 12.5, color: Colors.blueGrey),
                         ),
                       ),
