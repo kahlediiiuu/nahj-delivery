@@ -56,6 +56,11 @@ class ApiService {
           .timeout(const Duration(seconds: 10));
 
       if (res.statusCode == 200) return true;
+      if (res.statusCode == 409) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('session_invalidated', true);
+        return false;
+      }
       await _enqueue(payload);
       return false;
     } catch (_) {
