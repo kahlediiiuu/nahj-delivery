@@ -10,7 +10,10 @@ function initLiveTracking(io) {
   // الحل: تقييد البث الفعلي لمرة واحدة كحد أقصى كل 3 ثوانٍ (Throttle)، بغض النظر عن عدد التحديثات الواردة.
   let pendingBroadcast = null;
   let lastBroadcastTime = 0;
-  const BROADCAST_MIN_INTERVAL_MS = 3000;
+  // ⚠️ تقليل حرج لاستهلاك النطاق الترددي (Bandwidth) - هذا هو السبب المباشر لتوقف الخدمة سابقًا
+  // على خطة Render المجانية (5 جيجا شهريًا فقط). البث كل 12 ثانية بدل 3 يوفر ~75% من البيانات
+  // المُرسَلة، ويبقى كافيًا جدًا لمتابعة إدارية (ليس سباق سيارات يحتاج تحديثًا فوريًا كل ثانية).
+  const BROADCAST_MIN_INTERVAL_MS = 12000;
 
   function scheduleBroadcast(data) {
     const now = Date.now();
