@@ -163,29 +163,6 @@ class _DailyNotesScreenState extends State<DailyNotesScreen> {
                     maxLines: 3,
                     decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'اكتب التفاصيل هنا...'),
                   ),
-                  const SizedBox(height: 16),
-                  if (_pickedImageBase64 != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.image, color: Colors.green),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text(_pickedImageName ?? 'صورة مرفقة', overflow: TextOverflow.ellipsis)),
-                          IconButton(
-                            icon: const Icon(Icons.close, size: 18),
-                            onPressed: () => setState(() { _pickedImageBase64 = null; _pickedImageName = null; }),
-                          ),
-                        ],
-                      ),
-                    ),
-                  OutlinedButton.icon(
-                    onPressed: _uploading ? null : _pickImage,
-                    icon: _uploading
-                        ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.attach_file),
-                    label: Text(_pickedImageBase64 == null ? 'إرفاق صورة' : 'تغيير الصورة'),
-                  ),
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
