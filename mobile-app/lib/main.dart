@@ -16,8 +16,24 @@ import 'screens/permission_gate_screen.dart';
 // أندرويد استدعاءها حتى لو كان التطبيق مغلقًا تمامًا وقت وصول الإشعار.
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // لا حاجة لأي كود هنا: نظام أندرويد نفسه يعرض الإشعار تلقائيًا من حقل
-  // "notification" الذي يرسله الخادم، حتى مع إغلاق التطبيق بالكامل.
+  // ✅ أوامر التتبع المباشر عند الطلب - هذه الآلية الوحيدة لأي إرسال GPS في كامل التطبيق الآن
+  if (message.data['type'] == 'location_request') {
+    try {
+      await LocationService.sendSingleLocationUpdate();
+    } catch (_) {}
+    return;
+  }
+  if (message.data['type'] == 'start_live_tracking') {
+    try {
+      await LocationService.startLiveTracking();
+    } catch (_) {}
+    return;
+  }
+  if (message.data['type'] == 'stop_live_tracking') {
+    LocationService.stopLiveTracking();
+    return;
+  }
+  // لبقية الإشعارات العادية: لا حاجة لأي كود هنا، نظام أندرويد يعرضها تلقائيًا من حقل "notification".
 }
 
 Future<void> main() async {
