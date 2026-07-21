@@ -264,6 +264,6 @@ document.getElementById('motivationalSelect')?.addEventListener('change', (e) =>
 setInterval(() => {
   loadConversations();
   if (currentDriverId) loadMessages();
-}, 40000); // 40 ثانية بدل 20 - توفير إضافي حرج للنطاق الترددي المجاني بعد بلوغ الحد الشهري
+}, 120000); // كل دقيقتين بدل 40 ثانية - توفير أقصى للنطاق الترددي
 
 loadConversations();
