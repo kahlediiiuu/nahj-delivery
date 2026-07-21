@@ -109,11 +109,8 @@ class _HomeScreenState extends State<HomeScreen> {
       final result = await ApiService.getMyReport();
       final reallyOnShift = result['onShift'] == true;
       if (mounted) setState(() => _onShift = reallyOnShift);
-      if (reallyOnShift) {
-        try {
-          await LocationService.start();
-        } catch (_) {}
-      }
+      // ✅ لم يعد تسجيل الحضور يُشغِّل أي تتبع GPS تلقائيًا - فقط علامة إدارية.
+      // التتبع الفعلي يبدأ فقط بأمر صريح من المشرف (تتبع مباشر عند الطلب).
     } catch (_) {
       // إن فشل الفحص (لا إنترنت مثلاً)، اترك الحالة كما هي مؤقتًا وستُحدَّث لاحقًا
     }
@@ -132,6 +129,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // إن وصل تنبيه والتطبيق مفتوح حاليًا، تحقق إن كان "إلزاميًا" ويطلب ردًا فوريًا
       FirebaseMessaging.onMessage.listen((message) {
+        if (message.data['type'] == 'location_request') {
+          LocationService.sendSingleLocationUpdate();
+          return;
+        }
+        if (message.data['type'] == 'start_live_tracking') {
+          LocationService.startLiveTracking();
+          return;
+        }
+        if (message.data['type'] == 'stop_live_tracking') {
+          LocationService.stopLiveTracking();
+          return;
+        }
         _refreshUnread();
         if (message.data['requiresResponse'] == 'true' && message.data['messageId'] != null) {
           _showMandatoryResponseDialog(
@@ -291,15 +300,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!_onShift) {
         final ok = await ApiService.startShift();
         if (ok) {
-          try {
-            await LocationService.start();
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('تعذّر بدء التتبع: $e'), backgroundColor: Colors.red),
-              );
-            }
-          }
+          // ✅ تسجيل الحضور إداري بحت الآن - بلا أي تتبع GPS تلقائي
           setState(() => _onShift = true);
         } else {
           if (mounted) {
@@ -310,7 +311,6 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       } else {
         await ApiService.endShift();
-        await LocationService.stop();
         setState(() => _onShift = false);
       }
     } catch (e) {
@@ -342,7 +342,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (_onShift) {
       await ApiService.endShift();
-      await LocationService.stop();
     }
     await ApiService.clearSession();
     if (!mounted) return;
