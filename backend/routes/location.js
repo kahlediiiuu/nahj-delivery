@@ -19,7 +19,7 @@ let workZoneCacheTime = 0;
 
 async function getWorkZone() {
   const now = Date.now();
-  if (workZoneCache && now - workZoneCacheTime < 60000) {
+  if (workZoneCache && now - workZoneCacheTime < 300000) {
     return workZoneCache;
   }
   try {
@@ -44,16 +44,36 @@ async function getWorkZone() {
   return workZoneCache;
 }
 
-async function isInsideWorkZone(lat, lng) {
-  const zone = await getWorkZone();
+function isInsideWorkZoneSync(lat, lng, zone) {
   return distanceMeters(lat, lng, zone.lat, zone.lng) <= zone.radiusMeters;
 }
 
-// ⚠️ الحد الأدنى بين كتابتين متتاليتين على Firestore (وليس Realtime Database) لكل مندوب.
-// السبب: Firestore له حد مجاني صارم (20,000 كتابة/يوم)، بينما Realtime Database أرخص بكثير عمليًا.
-// التتبع اللحظي على الخريطة يبقى فوريًا 100% (كل 8 ثوانٍ عبر RTDB)، فقط "الإحصائيات التراكمية"
-// في Firestore (المسافة اليومية وحالة "آخر ظهور") تُكتب كحد أقصى مرة كل 25 ثانية.
-const FIRESTORE_SYNC_MIN_INTERVAL_MS = 25000;
+// ⚠️⚠️⚠️ إصلاح جذري لاستهلاك النطاق الترددي (Bandwidth) الحقيقي:
+// السبب الفعلي للمشكلة السابقة لم يكن سرعة إرسال الموقع فقط، بل كان "عدد الاتصالات المنفصلة
+// بـ Firebase" في كل نبضة واحدة (كانت 6 اتصالات: 3 قراءة + 3 كتابة!). كل اتصال Firebase منفصل
+// يحمل تكلفة اتصال شبكة كاملة تُحتسب ضمن "Service-Initiated Bandwidth" على Render.
+//
+// الحل: (1) تخزين "الجلسة النشطة" في ذاكرة الخادم مباشرة (Map) بدل قراءتها من Firebase في كل
+// مرة - آمن لأن خادم Render يبقى عملية واحدة مستمرة، وليس Serverless يُعاد تشغيله باستمرار.
+// (2) دمج كل الكتابات (الموقع + تراكم المسافة) في استدعاء واحد فقط عبر update() متعدد المسارات.
+// (3) قراءة واحدة فقط بدل 3 (نجمع الموقع السابق وتراكم المسافة في نفس عقدة liveLocations).
+
+const activeSessionsCache = new Map(); // driverId -> { sessionId, cachedAt }
+const SESSION_CACHE_TTL_MS = 5 * 60 * 1000; // نُعيد التحقق من Firebase كل 5 دقائق فقط لكل مندوب
+
+async function getActiveSessionId(driverId) {
+  const cached = activeSessionsCache.get(driverId);
+  const now = Date.now();
+  if (cached && now - cached.cachedAt < SESSION_CACHE_TTL_MS) {
+    return cached.sessionId;
+  }
+  const snap = await rtdb.ref(`driverSessions/${driverId}`).once('value');
+  const sessionId = snap.val();
+  activeSessionsCache.set(driverId, { sessionId, cachedAt: now });
+  return sessionId;
+}
+
+const FIRESTORE_SYNC_MIN_INTERVAL_MS = 60000;
 
 router.post('/update', verifyToken, async (req, res) => {
   try {
@@ -69,12 +89,9 @@ router.post('/update', verifyToken, async (req, res) => {
       return res.status(400).json({ success: false, message: 'إحداثيات غير صالحة' });
     }
 
-    // ✅ فحص "جلسة واحدة نشطة": إن سجَّل المندوب الدخول من جهاز آخر لاحقًا، هذا الجهاز القديم
-    // يتوقف تلقائيًا عن التحكم بالموقع المعروض، فيُحدَّث الموقع فورًا بناءً على آخر جهاز دخل فعليًا
-    // (يحل مشكلة: مندوب لديه جوالان، القديم لا يزال يبث موقعًا قديمًا خاطئًا).
+    // فحص الجلسة الواحدة النشطة - من الذاكرة مباشرة في 99% من الأحيان (بدون أي اتصال Firebase)
     if (req.user.sessionId) {
-      const sessionSnap = await rtdb.ref(`driverSessions/${driverId}`).once('value');
-      const activeSessionId = sessionSnap.val();
+      const activeSessionId = await getActiveSessionId(driverId);
       if (activeSessionId && activeSessionId !== req.user.sessionId) {
         return res.status(409).json({
           success: false,
@@ -84,10 +101,14 @@ router.post('/update', verifyToken, async (req, res) => {
       }
     }
 
-    const insideZone = await isInsideWorkZone(lat, lng);
+    const zone = await getWorkZone(); // مخزَّن مؤقتًا 5 دقائق، لا يلمس Firebase في أغلب الأحيان
+    const insideZone = isInsideWorkZoneSync(lat, lng, zone);
 
+    // ✅ قراءة واحدة فقط: نجلب الموقع السابق + تراكم المسافة اليومية معًا من نفس العقدة
+    const today = new Date(now).toISOString().slice(0, 10);
     const prevSnap = await rtdb.ref(`liveLocations/${driverId}`).once('value');
     const prev = prevSnap.val();
+
     let distanceDelta = 0;
     if (prev && prev.lat && prev.lng) {
       distanceDelta = distanceMeters(prev.lat, prev.lng, lat, lng);
@@ -97,17 +118,15 @@ router.post('/update', verifyToken, async (req, res) => {
       }
     }
 
-    // تراكم المسافة اليومية أيضًا في RTDB (رخيص) بدل الاعتماد فقط على كتابة Firestore الفورية
-    const today = new Date(now).toISOString().slice(0, 10);
-    const dailyAccumRef = rtdb.ref(`dailyDistanceAccum/${driverId}/${today}`);
-    const accumSnap = await dailyAccumRef.once('value');
-    const accumData = accumSnap.val() || { totalMeters: 0, lastFirestoreSync: 0 };
-    const newTotalMeters = (accumData.totalMeters || 0) + distanceDelta;
+    // إن تغيّر اليوم (منتصف الليل) نُصفّر التراكم تلقائيًا
+    const prevDailyTotal = prev && prev.dailyDate === today ? (prev.dailyTotalMeters || 0) : 0;
+    const newDailyTotal = prevDailyTotal + distanceDelta;
 
-    const lastFirestoreSync = accumData.lastFirestoreSync || 0;
+    const lastFirestoreSync = (prev && prev.dailyDate === today ? prev.lastFirestoreSync : 0) || 0;
     const shouldSyncFirestore = now - lastFirestoreSync >= FIRESTORE_SYNC_MIN_INTERVAL_MS;
 
-    const locationData = {
+    // ✅ كتابة واحدة فقط: كل بيانات الموقع + التراكم اليومي في نفس العقدة دفعة واحدة
+    await rtdb.ref(`liveLocations/${driverId}`).set({
       lat,
       lng,
       speed: speed || 0,
@@ -119,35 +138,77 @@ router.post('/update', verifyToken, async (req, res) => {
       insideWorkZone: insideZone,
       timestamp: now,
       status: (speed || 0) > 1 ? 'moving' : 'stopped',
-    };
-
-    // 1) الموقع الحالي (RTDB) - يتحدَّث فوريًا في كل مرة، هذا هو أساس الخريطة المباشرة
-    await rtdb.ref(`liveLocations/${driverId}`).set(locationData);
-
-    // 2) سجل المسار التاريخي (RTDB أيضًا - رخيص جدًا)
-    await rtdb.ref(`locationHistory/${driverId}/${today}`).push({
-      lat, lng, speed: speed || 0, timestamp: now,
-    });
-
-    // 3) تحديث تراكم المسافة في RTDB دائمًا (رخيص، يحافظ على الدقة الكاملة)
-    await dailyAccumRef.set({
-      totalMeters: newTotalMeters,
+      dailyDate: today,
+      dailyTotalMeters: newDailyTotal,
       lastFirestoreSync: shouldSyncFirestore ? now : lastFirestoreSync,
     });
 
-    // 4) الكتابة على Firestore (الأغلى) فقط كل 25 ثانية كحد أقصى، وليس كل 8 ثوانٍ
+    // سجل المسار التاريخي: نخفّض تردده أيضًا (نقطة واحدة كل ~40 ثانية تقريبًا تكفي لإعادة تشغيل مسار واضح)
+    if (!prev || now - (prev.lastHistoryPoint || 0) >= 40000) {
+      await rtdb.ref(`locationHistory/${driverId}/${today}`).push({
+        lat, lng, speed: speed || 0, timestamp: now,
+      });
+      await rtdb.ref(`liveLocations/${driverId}/lastHistoryPoint`).set(now);
+    }
+
+    // الكتابة على Firestore (الأغلى واستهلاكًا) فقط كل 60 ثانية كحد أقصى
     if (shouldSyncFirestore) {
       await db.collection('drivers').doc(driverId).set(
         { lastSeen: now, lastKnownLocation: { lat, lng }, online: true },
         { merge: true }
       );
       await db.collection('dailyStats').doc(`${driverId}_${today}`).set(
-        { driverId, date: today, totalDistanceMeters: newTotalMeters, lastUpdate: now },
+        { driverId, date: today, totalDistanceMeters: newDailyTotal, lastUpdate: now },
         { merge: true }
       );
     }
 
     res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+// المشرف: طلب موقع فوري لمندوب معيّن (الآلية الوحيدة للحصول على موقع لحظي دقيق الآن،
+// بدل التتبع المستمر المكلف). يصل كإشعار صامت تمامًا لا يظهر للمندوب إطلاقًا.
+router.post('/request/:driverId', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { sendDataOnlyToDriver } = require('../utils/push');
+    const sent = await sendDataOnlyToDriver(req.params.driverId, { type: 'location_request' });
+    if (sent) {
+      res.json({ success: true, message: 'تم إرسال طلب الموقع، سيصل الموقع الفعلي خلال ثوانٍ' });
+    } else {
+      res.status(404).json({ success: false, message: 'تعذّر إرسال الطلب (المندوب لم يسجّل جهازه بعد)' });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+// المشرف: بدء جلسة تتبع مباشر حقيقية (تتكرر كل 12 ثانية تلقائيًا حتى الإيقاف أو 20 دقيقة كحد أقصى)
+router.post('/track/start/:driverId', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { sendDataOnlyToDriver } = require('../utils/push');
+    const sent = await sendDataOnlyToDriver(req.params.driverId, { type: 'start_live_tracking' });
+    if (sent) {
+      res.json({ success: true, message: 'بدأ التتبع المباشر، سيتوقف تلقائيًا بعد 20 دقيقة إن لم توقفه يدويًا' });
+    } else {
+      res.status(404).json({ success: false, message: 'تعذّر البدء (المندوب لم يسجّل جهازه بعد)' });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'خطأ في الخادم' });
+  }
+});
+
+// المشرف: إيقاف فوري لأي جلسة تتبع مباشر نشطة
+router.post('/track/stop/:driverId', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { sendDataOnlyToDriver } = require('../utils/push');
+    await sendDataOnlyToDriver(req.params.driverId, { type: 'stop_live_tracking' });
+    res.json({ success: true, message: 'تم إرسال أمر الإيقاف' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'خطأ في الخادم' });
