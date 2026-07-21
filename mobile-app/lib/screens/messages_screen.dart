@@ -252,17 +252,11 @@ class _MessagesScreenState extends State<MessagesScreen> {
                         },
                       ),
           ),
-          if (_uploading) const LinearProgressIndicator(),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(10),
               child: Row(
                 children: [
-                  IconButton(
-                    onPressed: _uploading ? null : _pickAndSendFile,
-                    icon: const Icon(Icons.attach_file),
-                    tooltip: 'إرفاق صورة وإرسالها للإدارة',
-                  ),
                   Expanded(
                     child: TextField(
                       controller: _controller,
