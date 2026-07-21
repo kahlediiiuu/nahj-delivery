@@ -230,6 +230,15 @@ window.openDriverDetails = function (driverId) {
     <button onclick="window.sendLocationProof('${driverId}', ${loc.lat}, ${loc.lng})" style="width:100%;padding:10px;margin-top:8px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;">
       📍 إرسال موقعه الحالي المسجَّل له كإثبات
     </button>` : ''}
+    <button onclick="window.startLiveTrack('${driverId}')" style="width:100%;padding:10px;margin-top:8px;background:#16a34a;color:#fff;border:none;border-radius:6px;cursor:pointer;">
+      ▶ بدء تتبع مباشر (20 دقيقة كحد أقصى)
+    </button>
+    <button onclick="window.stopLiveTrack('${driverId}')" style="width:100%;padding:10px;margin-top:8px;background:#dc2626;color:#fff;border:none;border-radius:6px;cursor:pointer;">
+      ⏹ إيقاف التتبع فورًا
+    </button>
+    <button onclick="window.requestLocationNow('${driverId}')" style="width:100%;padding:10px;margin-top:8px;background:#0891b2;color:#fff;border:none;border-radius:6px;cursor:pointer;">
+      📍 اطلب موقعه الآن (مرة واحدة فقط)
+    </button>
     <button onclick="window.toggleTodayRoute('${driverId}')" style="width:100%;padding:10px;margin-top:8px;background:${window.routeVisibleFor === driverId ? '#dc2626' : '#16a34a'};color:#fff;border:none;border-radius:6px;cursor:pointer;">
       ${window.routeVisibleFor === driverId ? '🛣️ إخفاء مسار اليوم' : '🛣️ عرض مسار اليوم على الخريطة'}
     </button>
@@ -239,6 +248,57 @@ window.openDriverDetails = function (driverId) {
     <div id="sessionLogBox" style="margin-top:10px;font-size:12px;"></div>
   `;
   modal.classList.remove('hidden');
+};
+
+window.startLiveTrack = async function (driverId) {
+  try {
+    const res = await fetch(`${API_URL}/location/track/start/${driverId}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      alert('✅ بدأ التتبع المباشر، ستظهر التحديثات على الخريطة كل ~12 ثانية. سيتوقف تلقائيًا بعد 20 دقيقة إن لم تُوقفه.');
+    } else {
+      alert('❌ ' + (data.message || 'تعذّر البدء'));
+    }
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم');
+  }
+};
+
+window.stopLiveTrack = async function (driverId) {
+  try {
+    const res = await fetch(`${API_URL}/location/track/stop/${driverId}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      alert('✅ تم إرسال أمر الإيقاف');
+    } else {
+      alert('❌ ' + (data.message || 'تعذّر الإيقاف'));
+    }
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم');
+  }
+};
+
+window.requestLocationNow = async function (driverId) {
+  try {
+    const res = await fetch(`${API_URL}/location/request/${driverId}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      alert('✅ تم إرسال الطلب، سيصل الموقع الفعلي خلال ثوانٍ معدودة وسيظهر تلقائيًا على الخريطة');
+    } else {
+      alert('❌ ' + (data.message || 'تعذّر إرسال الطلب'));
+    }
+  } catch (_) {
+    alert('❌ تعذّر الاتصال بالخادم');
+  }
 };
 
 window.showSessionLog = async function (driverId) {
@@ -402,7 +462,7 @@ socket.on('alerts:new', (alerts) => {
 });
 
 loadDrivers();
-setInterval(loadDrivers, 60000); // تحديث قائمة المناديب (الأسماء الجديدة إلخ) كل دقيقة
+setInterval(loadDrivers, 180000); // كل 3 دقائق بدل دقيقة - توفير إضافي
 
 // ================= الإشعار الجماعي =================
 document.getElementById('openBroadcastBtn').addEventListener('click', () => {
